@@ -2,9 +2,11 @@
   <div class="site-container">
     <NuxtRouteAnnouncer />
     <header class="site-header">
-      <div class="site-name">
-        <span class="texts">texts</span><span class="dot">.</span><span class="mom">mom</span>
-      </div>
+      <NuxtLink to="/" class="site-name-link">
+        <div class="site-name">
+          <span class="texts">texts</span><span class="dot">.</span><span class="mom">mom</span>
+        </div>
+      </NuxtLink>
       <nav class="site-nav">
         <NuxtLink to="/post" class="nav-link nav-link-post">POST</NuxtLink>
         <NuxtLink to="/about" class="nav-link">ABOUT</NuxtLink>
@@ -35,6 +37,7 @@
               v-model="form.text" 
               class="form-textarea" 
               rows="6"
+              maxlength="280"
               placeholder="Share the mom text that made you laugh, cry, or question reality..."
               required
             ></textarea>
@@ -178,7 +181,46 @@
       </div>
       <hr class="site-hr2">
       <div class="main-postit">
-        <div class="postit2">NOTICE: Every 60 seconds, over 2 million texts are sent by... mothers... all over the world. If you get a mom text, stay calm and immediately share it here.</div>        
+        <div class="postit2"><span class="green-notice">NOTICE:</span> Every 60 seconds, over 2 million texts are sent by... mothers... all over the world. If you get a mom text, stay calm and immediately share it here.</div>        
+      </div>
+      
+      <!-- Posts Section -->
+      <div v-if="posts.length > 0" class="posts-section">
+        <hr class="site-hr">
+        <h2 class="posts-title"> LIVE FEED: Someone's Mom Just Sent This<span class="green-period">.</span></h2>
+        <div class="posts-container">
+          <div v-for="post in paginatedPosts" :key="post.id" class="post-card">
+            <div class="post-header">
+              <span class="post-author">{{ post.name }}</span>
+              <span class="post-location">{{ post.location }}</span>
+            </div>
+            <div class="post-content">{{ post.message }}</div>
+            <div class="post-timestamp">{{ formatDate(post.created_at) }}</div>
+          </div>
+        </div>
+        
+        <!-- Pagination Controls -->
+        <div v-if="totalPages > 1" class="pagination">
+          <button 
+            @click="previousPage" 
+            :disabled="currentPage === 1" 
+            class="pagination-btn pagination-prev"
+          >
+            ← PREVIOUS
+          </button>
+          
+          <div class="pagination-info">
+            <span class="page-indicator">{{ currentPage }} of {{ totalPages }}</span>
+          </div>
+          
+          <button 
+            @click="nextPage" 
+            :disabled="currentPage === totalPages" 
+            class="pagination-btn pagination-next"
+          >
+            NEXT →
+          </button>
+        </div>
       </div>
     </main>
     <footer class="site-footer">
@@ -190,6 +232,55 @@
 </template>
 
 <script setup>
+import { createClient } from '@supabase/supabase-js'
+
+// Supabase configuration
+const supabaseUrl = 'https://dkugwkjmxkdwgihlrcsh.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrdWd3a2pteGtkd2dpaGxyY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4ODA2MTEsImV4cCI6MjA2ODQ1NjYxMX0.4RuyeQBnX5JxnPbF37mqf6GkIsX2R04Cne-eUgjEcpY'
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+// Supabase functions
+const addPost = async (postData) => {
+  const { data, error } = await supabase
+    .from('posts')
+    .insert([{
+      name: postData.name,
+      message: postData.message,
+      location: postData.location,
+      created_at: new Date().toISOString()
+    }])
+    .select()
+
+  if (error) {
+    console.error('Error adding post:', error)
+    return { post: null, error }
+  }
+
+  return { post: data[0], error: null }
+}
+
+const fetchPosts = async (page = 1, limit = 10) => {
+  const from = (page - 1) * limit
+  const to = from + limit - 1
+
+  const { data, error, count } = await supabase
+    .from('posts')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to)
+
+  if (error) {
+    console.error('Error fetching posts:', error)
+    return { posts: [], totalCount: 0, error }
+  }
+
+  return { 
+    posts: data || [], 
+    totalCount: count || 0, 
+    error: null 
+  }
+}
+
 const form = ref({
   name: '',
   text: '',
@@ -204,6 +295,19 @@ const contactForm = ref({
   country: '',
   state: ''
 })
+
+// Posts data from Supabase
+const posts = ref([])
+const isLoading = ref(false)
+const totalPostsCount = ref(0)
+
+// Pagination variables
+const currentPage = ref(1)
+const postsPerPage = 10
+
+// Computed properties for pagination
+const totalPages = computed(() => Math.ceil(totalPostsCount.value / postsPerPage))
+const paginatedPosts = computed(() => posts.value)
 
 const countries = [
   'United States',
@@ -240,18 +344,95 @@ const usStates = [
   'West Virginia', 'Wisconsin', 'Wyoming'
 ]
 
-const submitPost = () => {
+const submitPost = async () => {
   // Handle form submission here
   console.log('Form submitted:', form.value)
-  // You can add API call or other logic here
-  alert('Thank you for sharing your mom text!')
   
-  // Reset form
-  form.value = {
-    name: '',
-    text: '',
-    country: '',
-    state: ''
+  isLoading.value = true
+  
+  try {
+    // Create new post from POST form
+    const postData = {
+      name: form.value.name,
+      message: form.value.text,
+      location: form.value.state ? `${form.value.state}, ${form.value.country}` : form.value.country
+    }
+    
+    console.log('Attempting to add post:', postData)
+    const { post, error } = await addPost(postData)
+    
+    if (error) {
+      console.error('Full Supabase error object:', error)
+      console.error('Error details:', JSON.stringify(error, null, 2))
+      
+      // Check various ways the table not found error might appear
+      const errorString = JSON.stringify(error).toLowerCase()
+      const errorMessage = error.message || error.details || error.hint || 'Unknown error'
+      
+      if (errorString.includes('relation') && errorString.includes('does not exist') ||
+          errorString.includes('table') && errorString.includes('not found') ||
+          errorString.includes('posts') && errorString.includes('does not exist')) {
+        
+        alert('❌ Database table not found!\n\nThe posts table doesn\'t exist in your Supabase database yet.\n\nPlease create it by running the SQL commands shown in the browser console.')
+        
+        console.log(`
+🗄️ CREATE THE POSTS TABLE IN SUPABASE:
+
+1. Go to https://supabase.com/dashboard
+2. Select your project: dkugwkjmxkdwgihlrcsh
+3. Go to SQL Editor (left sidebar)
+4. Run this SQL:
+
+CREATE TABLE IF NOT EXISTS posts (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  message TEXT NOT NULL,
+  location TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow public read access" ON posts
+  FOR SELECT USING (true);
+
+CREATE POLICY "Allow public insert access" ON posts
+  FOR INSERT WITH CHECK (true);
+
+INSERT INTO posts (name, message, location) VALUES 
+  ('Sarah', 'honey can you pick up some milk on your way home also your father says the lawn mower is broken again and we need to call someone but I dont know who to call do you know anyone', 'California, United States'),
+  ('Mike', 'Mom just texted: "The internet is down. How do I fix it? Also, what\'s my password for the email? And can you come over this weekend to help me with the TV remote? It\'s not working right."', 'Texas, United States'),
+  ('Jessica', 'call me when you get this its important but not an emergency but kind of urgent but dont worry its nothing serious just call me ok love you', 'Ontario, Canada');
+
+5. Click RUN to execute the SQL
+6. Try submitting a post again!
+`)
+      } else {
+        alert(`❌ Database error occurred!\n\nError: ${errorMessage}\n\nCheck the browser console for full details.`)
+      }
+      return
+    }
+    
+    console.log('Post added successfully:', post)
+    alert('Thank you for sharing your mom text! It has been posted on the homepage.')
+    
+    // Reset form
+    form.value = {
+      name: '',
+      text: '',
+      country: '',
+      state: ''
+    }
+    
+    // Navigate to homepage and refresh posts
+    await navigateTo('/')
+    await loadPosts(1)
+    
+  } catch (error) {
+    console.error('Unexpected error submitting post:', error)
+    alert(`Unexpected error: ${error.message}. Check the console for details.`)
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -269,6 +450,87 @@ const submitContact = () => {
     country: '',
     state: ''
   }
+}
+
+// Load posts from Supabase
+const loadPosts = async (page = 1) => {
+  isLoading.value = true
+  currentPage.value = page
+  
+  try {
+    
+    const { posts: fetchedPosts, totalCount, error } = await fetchPosts(page, postsPerPage)
+    
+    if (error) {
+      console.error('Error loading posts:', error)
+      // Fallback to sample posts if Supabase fails
+      posts.value = [
+        {
+          id: 1,
+          name: 'Sarah',
+          message: 'honey can you pick up some milk on your way home also your father says the lawn mower is broken again and we need to call someone but I dont know who to call do you know anyone',
+          location: 'California, United States',
+          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 2,
+          name: 'Mike',
+          message: 'Mom just texted: "The internet is down. How do I fix it? Also, what\'s my password for the email? And can you come over this weekend to help me with the TV remote? It\'s not working right."',
+          location: 'Texas, United States',
+          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+        },
+        {
+          id: 3,
+          name: 'Jessica',
+          message: 'call me when you get this its important but not an emergency but kind of urgent but dont worry its nothing serious just call me ok love you',
+          location: 'Ontario, Canada',
+          created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+        }
+      ]
+      totalPostsCount.value = 3
+      return
+    }
+    
+    posts.value = fetchedPosts
+    totalPostsCount.value = totalCount
+    
+  } catch (error) {
+    console.error('Error loading posts:', error)
+    // Fallback to empty array
+    posts.value = []
+    totalPostsCount.value = 0
+  } finally {
+    isLoading.value = false
+  }
+}
+
+// Pagination functions
+const nextPage = async () => {
+  if (currentPage.value < totalPages.value) {
+    await loadPosts(currentPage.value + 1)
+  }
+}
+
+const previousPage = async () => {
+  if (currentPage.value > 1) {
+    await loadPosts(currentPage.value - 1)
+  }
+}
+
+// Load posts when component mounts
+onMounted(() => {
+  loadPosts(1)
+})
+
+// Helper function to format dates
+const formatDate = (dateString) => {
+  const date = new Date(dateString)
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date)
 }
 </script>
 
@@ -349,10 +611,20 @@ a:hover {
   align-items: center;
 }
 
+.site-name-link {
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+
+.site-name-link:hover {
+  transform: scale(1.02);
+}
+
 .site-name {
   font-size: 2.5rem;
   font-weight: bold;
   display: inline-block;
+  cursor: pointer;
 }
 
 .site-name .texts {
@@ -373,6 +645,11 @@ a:hover {
 
 /* Green periods for contact page heading */
 .green-period {
+  color: #00FFB3;
+}
+
+/* Green notice text */
+.green-notice {
   color: #00FFB3;
 }
 
@@ -597,6 +874,166 @@ main {
   font-size: 1.1rem;
   line-height: 1.8;
   color: white;
+}
+
+/* Posts section styling */
+.posts-section {
+  margin-top: 3rem;
+}
+
+.posts-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 55px;
+  text-align: center;
+  margin-top: 5rem;
+  margin-bottom: 2rem;
+  letter-spacing: 0.05em;
+  color: white;
+}
+
+.posts-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+.post-card {
+  background-color: #2A2A3E;
+  border-radius: 12px;
+  padding: 1.5rem;
+  border-left: 4px solid #FF007A;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.post-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(255, 0, 122, 0.15);
+}
+
+.post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.post-author {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  color: #FF007A;
+  letter-spacing: 0.05em;
+}
+
+.post-location {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
+  color: #00FFB3;
+  font-weight: 600;
+}
+
+.post-content {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: white;
+  margin-bottom: 1rem;
+  word-wrap: break-word;
+}
+
+.post-timestamp {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.85rem;
+  color: #888;
+  text-align: right;
+}
+
+/* Pagination styling */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 2rem;
+  margin-top: 3rem;
+  padding: 2rem 0;
+}
+
+.pagination-btn {
+  background-color: #2A2A3E;
+  color: white;
+  border: 2px solid #FF007A;
+  padding: 0.75rem 1.5rem;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background-color: #FF007A;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255, 0, 122, 0.3);
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: #555;
+  color: #888;
+}
+
+.pagination-info {
+  display: flex;
+  align-items: center;
+}
+
+.page-indicator {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  color: white;
+  font-weight: 600;
+  padding: 0.5rem 1rem;
+  background-color: #2A2A3E;
+  border-radius: 6px;
+  border: 1px solid #444;
+}
+
+/* Responsive design for posts */
+@media (max-width: 768px) {
+  .posts-container {
+    padding: 0 1rem;
+  }
+  
+  .post-card {
+    padding: 1rem;
+  }
+  
+  .post-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.25rem;
+  }
+  
+  .posts-title {
+    font-size: 36px;
+  }
+  
+  .pagination {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .pagination-btn {
+    min-width: 140px;
+    padding: 1rem 1.5rem;
+  }
 }
 
 .about-content p {
