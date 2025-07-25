@@ -225,9 +225,27 @@
     </main>
     <footer class="site-footer">
       <div class="copyright">
-        © 2025 texts.mom - All rights reserved
+        2025 texts.mom - All rights reserved
       </div>
     </footer>
+    
+    <!-- Success Modal -->
+    <div v-if="showSuccessModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <div class="success-icon">✓</div>
+          <h2 class="modal-title">TEXT SUBMITTED<span class="green-period">!</span></h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-message">Thank you for sharing your mom text! It has been posted and is now live on the homepage.</p>
+          <p class="modal-submessage">Your contribution helps others laugh, cry, and question reality together.</p>
+        </div>
+        <div class="modal-actions">
+          <button @click="viewHomepage" class="modal-btn modal-btn-primary">VIEW ON HOMEPAGE</button>
+          <button @click="closeModal" class="modal-btn modal-btn-secondary">SUBMIT ANOTHER</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -300,6 +318,7 @@ const contactForm = ref({
 const posts = ref([])
 const isLoading = ref(false)
 const totalPostsCount = ref(0)
+const showSuccessModal = ref(false)
 
 // Pagination variables
 const currentPage = ref(1)
@@ -414,7 +433,9 @@ INSERT INTO posts (name, message, location) VALUES
     }
     
     console.log('Post added successfully:', post)
-    alert('Thank you for sharing your mom text! It has been posted on the homepage.')
+    
+    // Show success modal instead of alert
+    showSuccessModal.value = true
     
     // Reset form
     form.value = {
@@ -424,8 +445,7 @@ INSERT INTO posts (name, message, location) VALUES
       state: ''
     }
     
-    // Navigate to homepage and refresh posts
-    await navigateTo('/')
+    // Refresh posts data for homepage
     await loadPosts(1)
     
   } catch (error) {
@@ -450,6 +470,16 @@ const submitContact = () => {
     country: '',
     state: ''
   }
+}
+
+// Modal action functions
+const closeModal = () => {
+  showSuccessModal.value = false
+}
+
+const viewHomepage = async () => {
+  showSuccessModal.value = false
+  await navigateTo('/')
 }
 
 // Load posts from Supabase
@@ -1056,6 +1086,182 @@ main {
   padding: 2rem 0;
   
   text-align: center;
+}
+
+/* Success Modal Styling */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background-color: #1B1B2A;
+  border: 2px solid #FF007A;
+  border-radius: 12px;
+  padding: 2.5rem;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(255, 0, 122, 0.3);
+  animation: modalSlideIn 0.3s ease-out;
+}
+
+@keyframes modalSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.success-icon {
+  width: 80px;
+  height: 80px;
+  background-color: #00FFB3;
+  color: #1B1B2A;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: bold;
+  margin: 0 auto 1.5rem;
+  animation: successPulse 0.6s ease-out;
+}
+
+@keyframes successPulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-title {
+  font-family: 'BebasNeue', Arial, sans-serif;
+  font-size: 2.5rem;
+  color: white;
+  margin: 0;
+  letter-spacing: 2px;
+}
+
+.modal-body {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.modal-message {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.2rem;
+  color: white;
+  margin: 0 0 1rem 0;
+  line-height: 1.6;
+}
+
+.modal-submessage {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  color: #B0B0B0;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.modal-btn {
+  font-family: 'BebasNeue', Arial, sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 160px;
+}
+
+.modal-btn-primary {
+  background-color: #FF007A;
+  color: white;
+}
+
+.modal-btn-primary:hover {
+  background-color: #ff4da6;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(255, 0, 122, 0.4);
+}
+
+.modal-btn-secondary {
+  background-color: transparent;
+  color: #00FFB3;
+  border: 2px solid #00FFB3;
+}
+
+.modal-btn-secondary:hover {
+  background-color: #00FFB3;
+  color: #1B1B2A;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 255, 179, 0.4);
+}
+
+/* Mobile responsiveness for modal */
+@media (max-width: 768px) {
+  .modal-content {
+    padding: 2rem;
+    margin: 1rem;
+  }
+  
+  .success-icon {
+    width: 60px;
+    height: 60px;
+    font-size: 2rem;
+  }
+  
+  .modal-title {
+    font-size: 2rem;
+  }
+  
+  .modal-message {
+    font-size: 1.1rem;
+  }
+  
+  .modal-actions {
+    flex-direction: column;
+  }
+  
+  .modal-btn {
+    width: 100%;
+    min-width: auto;
+  }
 }
 
 .copyright {
