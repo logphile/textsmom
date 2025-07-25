@@ -177,7 +177,7 @@
         <div class="fade-word fade-word-3">CONFUSING<span class="green-period">.</span></div>
       </div>
       <div class="main-blurb2">
-      You know a<span class="blurb2"> mom </span>text when you see one<span class="green-period">.</span>
+      You know a <span class="blurb2">mom</span> text when you see one<span class="green-period">.</span>
       </div>
       <hr class="site-hr2">
       <div class="main-postit">
@@ -968,12 +968,13 @@ a:hover {
 
 .nav-link-post {
   color: #FF007A;
-  text-decoration: underline;
+  text-decoration: none;
+  border-bottom: 2px solid #FF007A;
 }
 
 .nav-link-post:hover {
   color: #ff4da6;
-  text-decoration: underline;
+  border-bottom-color: #ff4da6;
 }
 
 /* Main content styling */
@@ -1000,6 +1001,10 @@ main {
 .blurb2 {
   font-family: 'Bebas Neue', sans-serif;
   color: #FF007A;
+  border-bottom: 3px solid #FF007A;
+  display: inline-block;
+  line-height: 0.9;
+  margin-bottom: -2px;
 }
 
 .postit {
