@@ -28,7 +28,7 @@ export default defineEventHandler(async (event) => {
 
     // Email content
     const emailContent = {
-      from: process.env.GMAIL_USER || 'noreply@textsmom.com',
+      from: process.env.GMAIL_USER || 'noreply@texts.mom',
       to: 'phoyce@gmail.com',
       subject: `New Contact Form Message from ${name}`,
       html: `

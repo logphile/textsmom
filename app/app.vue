@@ -171,6 +171,7 @@
     </main>
     <main v-else>
       <hr class="site-hr">
+      <h1 class="sr-only">TextsMom - Share Your Unhinged Mom Texts</h1>
       <div class="main-blurb">
         <div class="fade-word fade-word-1">UNHINGED<span class="green-period">.</span></div>
         <div class="fade-word fade-word-2">DERANGED<span class="green-period">.</span></div>
@@ -330,6 +331,158 @@
 
 <script setup>
 import { createClient } from '@supabase/supabase-js'
+
+// Dynamic page titles for SEO
+const route = useRoute()
+const getPageTitle = () => {
+  switch (route.path) {
+    case '/':
+      return 'TextsMom - Share Your Unhinged Mom Texts | Funny Mom Messages'
+    case '/post':
+      return 'Submit Your Mom Text - Share Funny Mom Messages | TextsMom'
+    case '/contact':
+      return 'Contact Us - Get in Touch | TextsMom'
+    case '/about':
+      return 'About TextsMom - The Home of Unhinged Mom Texts'
+    default:
+      return 'TextsMom - Share Your Unhinged Mom Texts'
+  }
+}
+
+// Set dynamic page title and meta description
+useHead({
+  title: computed(() => getPageTitle()),
+  meta: [
+    {
+      name: 'description',
+      content: computed(() => {
+        switch (route.path) {
+          case '/':
+            return 'Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world. Join our community of mom text survivors.'
+          case '/post':
+            return 'Submit your funny, confusing, or unhinged mom text messages to share with our community. Help others laugh and feel less alone.'
+          case '/contact':
+            return 'Get in touch with the TextsMom team. We welcome feedback, suggestions, and your mom text horror stories.'
+          case '/about':
+            return 'Learn about TextsMom, the community dedicated to sharing and celebrating the glorious dysfunction of modern motherhood through text messages.'
+          default:
+            return 'TextsMom - The home of unhinged mom texts from around the world.'
+        }
+      })
+    },
+    { property: 'og:title', content: computed(() => getPageTitle()) },
+    { property: 'og:description', content: computed(() => {
+        switch (route.path) {
+          case '/':
+            return 'Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world.'
+          case '/post':
+            return 'Submit your funny, confusing, or unhinged mom text messages to share with our community.'
+          case '/contact':
+            return 'Get in touch with the TextsMom team. We welcome feedback and suggestions.'
+          case '/about':
+            return 'Learn about TextsMom, the community dedicated to sharing the glorious dysfunction of modern motherhood.'
+          default:
+            return 'TextsMom - The home of unhinged mom texts from around the world.'
+        }
+      })
+    },
+    { property: 'og:type', content: 'website' },
+    { property: 'og:url', content: computed(() => `https://texts.mom${route.path}`) },
+    { property: 'og:site_name', content: 'TextsMom' },
+    { name: 'twitter:card', content: 'summary_large_image' },
+    { name: 'twitter:site', content: '@textsmom' },
+    { name: 'keywords', content: 'mom texts, funny mom messages, unhinged texts, family humor, text messages, mom jokes, parenting humor' },
+    { name: 'author', content: 'TextsMom' },
+    { name: 'robots', content: 'index, follow' },
+    { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+    { 'http-equiv': 'X-UA-Compatible', content: 'IE=edge' },
+    { name: 'theme-color', content: '#FF007A' },
+    { name: 'msapplication-TileColor', content: '#FF007A' },
+    { name: 'application-name', content: 'TextsMom' },
+    { name: 'apple-mobile-web-app-title', content: 'TextsMom' },
+    { name: 'apple-mobile-web-app-capable', content: 'yes' },
+    { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+    { name: 'format-detection', content: 'telephone=no' },
+    { name: 'generator', content: 'Nuxt.js' }
+  ],
+  link: [
+    { rel: 'canonical', href: computed(() => `https://texts.mom${route.path}`) }
+  ],
+  script: [
+    {
+      type: 'application/ld+json',
+      children: computed(() => JSON.stringify({
+        '@context': 'https://schema.org',
+        '@graph': [
+          {
+            '@type': 'WebSite',
+            '@id': 'https://texts.mom/#website',
+            'url': 'https://texts.mom/',
+            'name': 'TextsMom',
+            'description': 'Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world.',
+            'potentialAction': {
+              '@type': 'SearchAction',
+              'target': 'https://texts.mom/?s={search_term_string}',
+              'query-input': 'required name=search_term_string'
+            }
+          },
+          {
+            '@type': 'Organization',
+            '@id': 'https://texts.mom/#organization',
+            'name': 'TextsMom',
+            'url': 'https://texts.mom/',
+            'description': 'A community platform for sharing funny, unhinged, and confusing text messages from mothers.',
+            'sameAs': [
+              'https://twitter.com/textsmom',
+              'https://facebook.com/textsmom'
+            ]
+          },
+          {
+            '@type': 'WebPage',
+            '@id': `https://texts.mom${route.path}#webpage`,
+            'url': `https://texts.mom${route.path}`,
+            'name': getPageTitle(),
+            'description': (() => {
+              switch (route.path) {
+                case '/':
+                  return 'Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world.'
+                case '/post':
+                  return 'Submit your funny, confusing, or unhinged mom text messages to share with our community.'
+                case '/contact':
+                  return 'Get in touch with the TextsMom team. We welcome feedback and suggestions.'
+                case '/about':
+                  return 'Learn about TextsMom, the community dedicated to sharing the glorious dysfunction of modern motherhood.'
+                default:
+                  return 'TextsMom - The home of unhinged mom texts from around the world.'
+              }
+            })(),
+            'isPartOf': {
+              '@id': 'https://texts.mom/#website'
+            },
+            'about': {
+              '@id': 'https://texts.mom/#organization'
+            }
+          }
+        ]
+      }))
+    },
+    {
+      src: 'https://www.googletagmanager.com/gtag/js?id=G-F7NW6VS4H4',
+      async: true
+    },
+    {
+      children: `
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-F7NW6VS4H4', {
+          page_title: document.title,
+          page_location: window.location.href
+        });
+      `
+    }
+  ]
+})
 
 // Supabase configuration
 const supabaseUrl = 'https://dkugwkjmxkdwgihlrcsh.supabase.co'
@@ -1556,6 +1709,34 @@ main {
   margin-top: 2.5rem;
   padding-top: 2rem;
   border-top: 1px solid #FF007A;
+}
+
+/* Screen reader only class for SEO */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Performance optimizations for Core Web Vitals */
+* {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Reduce layout shift */
+.fade-word {
+  min-height: 1em;
 }
 
 /* Footer styling */
