@@ -510,6 +510,40 @@ const hasUserVoted = (postId, voteType) => {
   return userVotes.value.get(postId) === voteType
 }
 
+// Contact form submission
+const submitContact = async () => {
+  try {
+    // Send email via API
+    const response = await $fetch('/api/send-email', {
+      method: 'POST',
+      body: {
+        name: contactForm.value.name,
+        email: contactForm.value.email,
+        message: contactForm.value.message,
+        country: contactForm.value.country,
+        state: contactForm.value.state
+      }
+    })
+    
+    if (response.success) {
+      // Show success message
+      alert('Message sent successfully! We\'ll get back to you soon.')
+      
+      // Reset form
+      contactForm.value = {
+        name: '',
+        email: '',
+        message: '',
+        country: '',
+        state: ''
+      }
+    }
+  } catch (error) {
+    console.error('Error sending contact message:', error)
+    alert('Sorry, there was an error sending your message. Please try again later.')
+  }
+}
+
 // Pagination variables
 const currentPage = ref(1)
 const postsPerPage = 10
