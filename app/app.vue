@@ -8,7 +8,7 @@
         </div>
       </NuxtLink>
       <nav class="site-nav">
-        <NuxtLink to="/post" class="nav-link nav-link-post">POST</NuxtLink>
+        <NuxtLink to="/post" class="nav-link nav-link-post">POST!</NuxtLink>
         <NuxtLink to="/about" class="nav-link">ABOUT</NuxtLink>
         <NuxtLink to="/contact" class="nav-link">CONTACT</NuxtLink>
       </nav>
@@ -162,7 +162,7 @@
           <p>But somewhere between the missed punctuation, the all-caps threats, the cryptic emojis, and the "who is this" follow-ups… something unravels<span class="green-period">.</span></p>
           
           <p>texts<span class="green-period">.</span>mom is a shrine to the glorious dysfunction of modern motherhood—one, unhinged message at a time<span class="green-period">.</span></p>
-          <p>We don't judge<span class="green-period">.</span> We just document<span class="green-period">.</span></p>
+          <p>We don't judge<span class="green-period">.</span> Okay, maybe a little<span class="green-period">.</span> We just document<span class="green-period">.</span></p>
           <p>Whether it's passive-aggressive guilt, baffling autocorrects, or love disguised as psychological warfare, if she texted it—you can post it<span class="green-period">.</span></p>
           
           <p class="about-final">You're not alone<span class="green-period">.</span> Your mom just texts like this<span class="green-period">.</span></p>
@@ -187,7 +187,14 @@
       <!-- Posts Section -->
       <div v-if="posts.length > 0" class="posts-section">
         <hr class="site-hr">
-        <h2 class="posts-title"> LIVE FEED: Someone's Mom Just Sent This<span class="green-period">.</span></h2>
+        <div class="feed-title-container">
+          <div class="feed-title-main">
+            <span class="live-indicator">● LIVE</span>
+            <span class="feed-title-text">FRESH TEXTS</span>
+            <span class="mom-text-highlight">FROM MOMS</span>
+          </div>
+          <div class="feed-subtitle">Real texts<span class="green-period">.</span> Real chaos<span class="green-period">.</span> Real moms<span class="green-period">.</span></div>
+        </div>
         <div class="posts-container">
           <div v-for="post in paginatedPosts" :key="post.id" class="post-card">
             <div class="post-header">
@@ -195,7 +202,25 @@
               <span class="post-location">{{ post.location }}</span>
             </div>
             <div class="post-content">{{ post.message }}</div>
-            <div class="post-timestamp">{{ formatDate(post.created_at) }}</div>
+            <div class="post-footer">
+              <div class="post-timestamp">{{ formatDate(post.created_at) }}</div>
+              <div class="post-voting">
+                <button 
+                  @click="voteOnPost(post.id, 'up')"
+                  :class="['vote-btn', 'vote-up', { 'voted': hasUserVoted(post.id, 'up') }]"
+                  :disabled="isVoting"
+                >
+                  👍 <span class="vote-count">{{ post.likes || 0 }}</span>
+                </button>
+                <button 
+                  @click="voteOnPost(post.id, 'down')"
+                  :class="['vote-btn', 'vote-down', { 'voted': hasUserVoted(post.id, 'down') }]"
+                  :disabled="isVoting"
+                >
+                  👎 <span class="vote-count">{{ post.dislikes || 0 }}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
         
@@ -282,6 +307,24 @@
         </div>
       </div>
     </div>
+    
+    <!-- OpenAI Moderation Modal -->
+    <div v-if="showModerationModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <div class="warning-icon">🤖</div>
+          <h2 class="modal-title">CONTENT FLAGGED<span class="green-period">!</span></h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-message">Our AI moderation system has flagged your content.</p>
+          <p class="modal-submessage">Detected: <strong>{{ moderationViolationType }}</strong></p>
+          <p class="modal-submessage">Please revise your message to comply with our community guidelines.</p>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeModal" class="modal-btn modal-btn-primary">REVISE CONTENT</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -357,8 +400,14 @@ const totalPostsCount = ref(0)
 const showSuccessModal = ref(false)
 const showProfanityModal = ref(false)
 const showRateLimitModal = ref(false)
+const showModerationModal = ref(false)
 const rateLimitRemainingTime = ref(0)
 const profanityModalType = ref('') // 'name' or 'text'
+const moderationViolationType = ref('') // OpenAI flagged categories
+
+// Voting functionality
+const isVoting = ref(false)
+const userVotes = ref(new Map()) // Track user votes locally
 
 // Phase 1 Moderation: Rate limiting and profanity filter
 const isSubmitting = ref(false)
@@ -367,9 +416,7 @@ const RATE_LIMIT_SECONDS = 30
 
 // Basic profanity word list for client-side filtering
 const profanityWords = [
-  'fuck', 'shit', 'damn', 'bitch', 'ass', 'hell', 'crap', 'piss',
-  'bastard', 'slut', 'whore', 'faggot', 'nigger', 'retard', 'gay',
-  'stupid', 'idiot', 'moron', 'dumb', 'hate', 'kill', 'die', 'suicide'
+  'fuck', 'faggot', 'nigger', 'kill', 'die', 'suicide'
 ]
 
 // Function to check for profanity
@@ -396,6 +443,71 @@ const checkRateLimit = () => {
   }
   
   return { allowed: true, remainingTime: 0 }
+}
+
+// Voting functions
+const voteOnPost = async (postId, voteType) => {
+  if (isVoting.value) return
+  
+  isVoting.value = true
+  
+  try {
+    // Check if user has already voted on this post
+    const existingVote = userVotes.value.get(postId)
+    
+    // If user clicks the same vote type they already voted, remove the vote
+    if (existingVote === voteType) {
+      await removeVote(postId, voteType)
+      userVotes.value.delete(postId)
+    } else {
+      // If user had a different vote, remove it first
+      if (existingVote) {
+        await removeVote(postId, existingVote)
+      }
+      
+      // Add the new vote
+      await addVote(postId, voteType)
+      userVotes.value.set(postId, voteType)
+    }
+    
+    // Refresh posts to show updated counts
+    await loadPosts(currentPage.value)
+    
+  } catch (error) {
+    console.error('Error voting on post:', error)
+  } finally {
+    isVoting.value = false
+  }
+}
+
+const addVote = async (postId, voteType) => {
+  const column = voteType === 'up' ? 'likes' : 'dislikes'
+  
+  const { error } = await supabase
+    .from('posts')
+    .update({ [column]: supabase.raw(`${column} + 1`) })
+    .eq('id', postId)
+  
+  if (error) {
+    throw error
+  }
+}
+
+const removeVote = async (postId, voteType) => {
+  const column = voteType === 'up' ? 'likes' : 'dislikes'
+  
+  const { error } = await supabase
+    .from('posts')
+    .update({ [column]: supabase.raw(`GREATEST(${column} - 1, 0)`) })
+    .eq('id', postId)
+  
+  if (error) {
+    throw error
+  }
+}
+
+const hasUserVoted = (postId, voteType) => {
+  return userVotes.value.get(postId) === voteType
 }
 
 // Pagination variables
@@ -470,6 +582,30 @@ const submitPost = async () => {
   isSubmitting.value = true
   
   try {
+    // Phase 2 Moderation: OpenAI API check
+    console.log('Running Phase 2 moderation check...')
+    const moderationResponse = await $fetch('/api/moderate', {
+      method: 'POST',
+      body: {
+        text: form.value.text,
+        name: form.value.name
+      }
+    })
+    
+    console.log('Moderation result:', moderationResponse)
+    
+    // If content is flagged by OpenAI, show specific error
+    if (moderationResponse.flagged) {
+      const flaggedCategories = Object.keys(moderationResponse.categories)
+        .filter(key => moderationResponse.categories[key])
+        .map(category => category.replace('_', ' '))
+        .join(', ')
+      
+      // Show moderation modal with specific violation details
+      showModerationModal.value = true
+      moderationViolationType.value = flaggedCategories || 'inappropriate content'
+      return
+    }
     // Create new post from POST form
     const postData = {
       name: form.value.name,
@@ -581,6 +717,7 @@ const closeModal = () => {
   showSuccessModal.value = false
   showProfanityModal.value = false
   showRateLimitModal.value = false
+  showModerationModal.value = false
 }
 
 const viewHomepage = async () => {
@@ -811,10 +948,12 @@ a:hover {
 
 .nav-link-post {
   color: #FF007A;
+  text-decoration: underline;
 }
 
 .nav-link-post:hover {
   color: #ff4da6;
+  text-decoration: underline;
 }
 
 /* Main content styling */
@@ -1027,6 +1166,122 @@ main {
   color: white;
 }
 
+/* New Feed Title Design */
+.feed-title-container {
+  text-align: center;
+  margin: 4rem 0 3rem 0;
+  padding: 2rem;
+  position: relative;
+}
+
+.feed-title-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.live-indicator {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.2rem;
+  color: #FF007A;
+  letter-spacing: 0.1em;
+  animation: livePulse 2s ease-in-out infinite;
+  background: linear-gradient(45deg, #FF007A, #ff4da6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.5rem;
+}
+
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.05); }
+}
+
+.feed-title-text {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 3.5rem;
+  color: white;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.mom-text-highlight {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 4.5rem;
+  background: linear-gradient(135deg, #FF007A 0%, #00FFB3 50%, #FF007A 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  background-size: 200% 200%;
+  animation: gradientShift 3s ease-in-out infinite;
+  letter-spacing: 0.1em;
+  line-height: 1;
+  text-shadow: 0 0 20px rgba(255, 0, 122, 0.3);
+  position: relative;
+}
+
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.mom-text-highlight::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, transparent 0%, rgba(255, 0, 122, 0.1) 50%, transparent 100%);
+  animation: shimmer 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0; transform: translateX(-100%); }
+  50% { opacity: 1; transform: translateX(100%); }
+}
+
+.feed-subtitle {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.1rem;
+  color: #cccccc;
+  font-style: italic;
+  letter-spacing: 0.02em;
+  margin-top: 1rem;
+  opacity: 0.9;
+  animation: subtitleFade 4s ease-in-out infinite;
+}
+
+@keyframes subtitleFade {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 0.6; }
+}
+
+/* Responsive design for feed title */
+@media (max-width: 768px) {
+  .feed-title-text {
+    font-size: 2.5rem;
+  }
+  
+  .mom-text-highlight {
+    font-size: 3.2rem;
+  }
+  
+  .feed-subtitle {
+    font-size: 1rem;
+  }
+  
+  .feed-title-container {
+    margin: 2rem 0;
+    padding: 1rem;
+  }
+}
+
 .posts-container {
   display: flex;
   flex-direction: column;
@@ -1081,11 +1336,103 @@ main {
   word-wrap: break-word;
 }
 
+.post-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
 .post-timestamp {
   font-family: 'Nunito', sans-serif;
   font-size: 0.85rem;
   color: #888;
-  text-align: right;
+}
+
+.post-voting {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.vote-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: #2A2A3E;
+  border: 2px solid #444;
+  color: #ccc;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 60px;
+  justify-content: center;
+}
+
+.vote-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.vote-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.vote-up:hover:not(:disabled) {
+  border-color: #00FFB3;
+  background-color: rgba(0, 255, 179, 0.1);
+  color: #00FFB3;
+}
+
+.vote-down:hover:not(:disabled) {
+  border-color: #FF007A;
+  background-color: rgba(255, 0, 122, 0.1);
+  color: #FF007A;
+}
+
+.vote-btn.voted.vote-up {
+  border-color: #00FFB3;
+  background-color: rgba(0, 255, 179, 0.2);
+  color: #00FFB3;
+  font-weight: 600;
+}
+
+.vote-btn.voted.vote-down {
+  border-color: #FF007A;
+  background-color: rgba(255, 0, 122, 0.2);
+  color: #FF007A;
+  font-weight: 600;
+}
+
+.vote-count {
+  font-weight: 600;
+  min-width: 20px;
+  text-align: center;
+}
+
+/* Responsive voting buttons */
+@media (max-width: 768px) {
+  .post-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+  
+  .post-voting {
+    align-self: flex-end;
+  }
+  
+  .vote-btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 0.8rem;
+    min-width: 50px;
+  }
 }
 
 /* Pagination styling */
