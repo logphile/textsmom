@@ -246,6 +246,42 @@
         </div>
       </div>
     </div>
+    
+    <!-- Profanity Filter Modal -->
+    <div v-if="showProfanityModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <div class="warning-icon">🚫</div>
+          <h2 class="modal-title">CONTENT FILTERED<span class="green-period">!</span></h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-message" v-if="profanityModalType === 'name'">Your mom says a lot of things but she didn't name you that. Keep your name clean and family-friendly.</p>
+          <p class="modal-message" v-else>Your mom text contains inappropriate language. We were shocked too.</p>
+          <p class="modal-submessage" v-if="profanityModalType === 'name'">We want to maintain a positive community for everyone.</p>
+          <p class="modal-submessage" v-else>We know mom texts can be wild, but let's keep the language clean!</p>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeModal" class="modal-btn modal-btn-primary">GOT IT</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Rate Limit Modal -->
+    <div v-if="showRateLimitModal" class="modal-overlay" @click="closeModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <div class="warning-icon">⏰</div>
+          <h2 class="modal-title">WHOA! SLOW DOWN THERE!<span class="green-period">!</span></h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-message">You can submit another post in {{ rateLimitRemainingTime }} seconds.</p>
+          <p class="modal-submessage">This helps prevent spam and keeps the quality high.</p>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeModal" class="modal-btn modal-btn-primary">UNDERSTOOD</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -319,6 +355,48 @@ const posts = ref([])
 const isLoading = ref(false)
 const totalPostsCount = ref(0)
 const showSuccessModal = ref(false)
+const showProfanityModal = ref(false)
+const showRateLimitModal = ref(false)
+const rateLimitRemainingTime = ref(0)
+const profanityModalType = ref('') // 'name' or 'text'
+
+// Phase 1 Moderation: Rate limiting and profanity filter
+const isSubmitting = ref(false)
+const lastSubmissionTime = ref(0)
+const RATE_LIMIT_SECONDS = 30
+
+// Basic profanity word list for client-side filtering
+const profanityWords = [
+  'fuck', 'shit', 'damn', 'bitch', 'ass', 'hell', 'crap', 'piss',
+  'bastard', 'slut', 'whore', 'faggot', 'nigger', 'retard', 'gay',
+  'stupid', 'idiot', 'moron', 'dumb', 'hate', 'kill', 'die', 'suicide'
+]
+
+// Function to check for profanity
+const containsProfanity = (text) => {
+  const lowerText = text.toLowerCase()
+  return profanityWords.some(word => {
+    // Check for exact word matches with word boundaries
+    const regex = new RegExp(`\\b${word}\\b`, 'i')
+    return regex.test(lowerText)
+  })
+}
+
+// Function to check rate limiting
+const checkRateLimit = () => {
+  const now = Date.now()
+  const timeSinceLastSubmission = (now - lastSubmissionTime.value) / 1000
+  
+  if (timeSinceLastSubmission < RATE_LIMIT_SECONDS) {
+    const remainingTime = Math.ceil(RATE_LIMIT_SECONDS - timeSinceLastSubmission)
+    return {
+      allowed: false,
+      remainingTime
+    }
+  }
+  
+  return { allowed: true, remainingTime: 0 }
+}
 
 // Pagination variables
 const currentPage = ref(1)
@@ -364,10 +442,32 @@ const usStates = [
 ]
 
 const submitPost = async () => {
+  // Phase 1 Moderation: Check rate limiting
+  const rateCheck = checkRateLimit()
+  if (!rateCheck.allowed) {
+    rateLimitRemainingTime.value = rateCheck.remainingTime
+    showRateLimitModal.value = true
+    return
+  }
+  
+  // Phase 1 Moderation: Check for profanity in name and text
+  if (containsProfanity(form.value.name)) {
+    profanityModalType.value = 'name'
+    showProfanityModal.value = true
+    return
+  }
+  
+  if (containsProfanity(form.value.text)) {
+    profanityModalType.value = 'text'
+    showProfanityModal.value = true
+    return
+  }
+  
   // Handle form submission here
   console.log('Form submitted:', form.value)
   
   isLoading.value = true
+  isSubmitting.value = true
   
   try {
     // Create new post from POST form
@@ -437,6 +537,9 @@ INSERT INTO posts (name, message, location) VALUES
     // Show success modal instead of alert
     showSuccessModal.value = true
     
+    // Update rate limiting timestamp
+    lastSubmissionTime.value = Date.now()
+    
     // Reset form
     form.value = {
       name: '',
@@ -453,6 +556,7 @@ INSERT INTO posts (name, message, location) VALUES
     alert(`Unexpected error: ${error.message}. Check the console for details.`)
   } finally {
     isLoading.value = false
+    isSubmitting.value = false
   }
 }
 
@@ -475,10 +579,12 @@ const submitContact = () => {
 // Modal action functions
 const closeModal = () => {
   showSuccessModal.value = false
+  showProfanityModal.value = false
+  showRateLimitModal.value = false
 }
 
 const viewHomepage = async () => {
-  showSuccessModal.value = false
+  closeModal()
   await navigateTo('/')
 }
 
@@ -1148,6 +1254,35 @@ main {
 }
 
 @keyframes successPulse {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.warning-icon {
+  width: 80px;
+  height: 80px;
+  background-color: #FF007A;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  font-weight: bold;
+  margin: 0 auto 1.5rem;
+  animation: warningPulse 0.6s ease-out;
+}
+
+@keyframes warningPulse {
   0% {
     transform: scale(0);
     opacity: 0;
