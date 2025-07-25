@@ -730,21 +730,7 @@ INSERT INTO posts (name, message, location) VALUES
   }
 }
 
-const submitContact = () => {
-  // Handle contact form submission here
-  console.log('Contact form submitted:', contactForm.value)
-  // You can add API call or other logic here
-  alert('Thanks for reaching out! We\'ll get back to you soon.')
-  
-  // Reset contact form
-  contactForm.value = {
-    name: '',
-    email: '',
-    message: '',
-    country: '',
-    state: ''
-  }
-}
+
 
 // Modal action functions
 const closeModal = () => {
