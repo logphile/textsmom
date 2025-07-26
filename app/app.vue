@@ -7,11 +7,31 @@
           <span class="texts">texts</span><span class="dot">.</span><span class="mom">mom</span>
         </div>
       </NuxtLink>
-      <nav class="site-nav">
+      
+      <!-- Desktop Navigation -->
+      <nav class="site-nav desktop-nav">
         <NuxtLink to="/post" class="nav-link nav-link-post">POST!</NuxtLink>
         <NuxtLink to="/about" class="nav-link">ABOUT</NuxtLink>
         <NuxtLink to="/contact" class="nav-link">CONTACT</NuxtLink>
       </nav>
+      
+      <!-- Mobile Hamburger Menu -->
+      <div class="mobile-nav">
+        <button @click="toggleMobileMenu" class="hamburger-btn" :class="{ 'active': showMobileMenu }">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+        
+        <!-- Mobile menu backdrop -->
+        <div class="mobile-backdrop" :class="{ 'active': showMobileMenu }" @click="closeMobileMenu"></div>
+        
+        <nav class="mobile-menu" :class="{ 'active': showMobileMenu }">
+          <NuxtLink to="/post" class="mobile-nav-link" @click="closeMobileMenu">POST!</NuxtLink>
+          <NuxtLink to="/about" class="mobile-nav-link" @click="closeMobileMenu">ABOUT</NuxtLink>
+          <NuxtLink to="/contact" class="mobile-nav-link" @click="closeMobileMenu">CONTACT</NuxtLink>
+        </nav>
+      </div>
     </header>
     <main v-if="$route.path === '/post'">
       <hr class="site-hr">
@@ -196,6 +216,31 @@
           </div>
           <div class="feed-subtitle">Real texts<span class="green-period">.</span> Real chaos<span class="green-period">.</span> Real moms<span class="green-period">.</span></div>
         </div>
+        
+        <!-- Search and Filter Bar -->
+        <div class="search-filter-bar">
+          <div class="search-container">
+            <input 
+              type="text" 
+              v-model="searchQuery" 
+              placeholder="Search texts..."
+              class="search-input"
+              @input="filterPosts"
+            >
+            <span class="search-icon">🔍</span>
+          </div>
+          
+          <div class="filter-container">
+            <select v-model="filterOption" @change="filterPosts" class="filter-select">
+              <option value="all">All Posts</option>
+              <option value="newest">Newest First</option>
+              <option value="oldest">Oldest First</option>
+              <option value="most-liked">Most Liked</option>
+              <option value="most-disliked">Most Controversial</option>
+            </select>
+          </div>
+        </div>
+        
         <div class="posts-container">
           <div v-for="post in paginatedPosts" :key="post.id" class="post-card">
             <div class="post-header">
@@ -562,6 +607,65 @@ const moderationViolationType = ref('') // OpenAI flagged categories
 const isVoting = ref(false)
 const userVotes = ref(new Map()) // Track user votes locally
 
+// Mobile menu functionality
+const showMobileMenu = ref(false)
+
+const toggleMobileMenu = () => {
+  showMobileMenu.value = !showMobileMenu.value
+}
+
+const closeMobileMenu = () => {
+  showMobileMenu.value = false
+}
+
+// Search and filter functionality
+const searchQuery = ref('')
+const filterOption = ref('all')
+const filteredPosts = ref([])
+
+const filterPosts = () => {
+  let filtered = [...posts.value]
+  
+  // Apply search filter
+  if (searchQuery.value.trim()) {
+    const query = searchQuery.value.toLowerCase()
+    filtered = filtered.filter(post => 
+      post.name.toLowerCase().includes(query) ||
+      post.message.toLowerCase().includes(query) ||
+      post.location.toLowerCase().includes(query)
+    )
+  }
+  
+  // Apply sort filter
+  switch (filterOption.value) {
+    case 'newest':
+      filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      break
+    case 'oldest':
+      filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      break
+    case 'most-liked':
+      filtered.sort((a, b) => (b.likes || 0) - (a.likes || 0))
+      break
+    case 'most-disliked':
+      filtered.sort((a, b) => (b.dislikes || 0) - (a.dislikes || 0))
+      break
+    default:
+      // 'all' - keep original order
+      break
+  }
+  
+  filteredPosts.value = filtered
+  currentPage.value = 1 // Reset to first page when filtering
+}
+
+// Initialize filtered posts when posts are loaded
+watch(posts, (newPosts) => {
+  if (newPosts.length > 0 && filteredPosts.value.length === 0) {
+    filteredPosts.value = [...newPosts]
+  }
+}, { immediate: true })
+
 // Phase 1 Moderation: Rate limiting and profanity filter
 const isSubmitting = ref(false)
 const lastSubmissionTime = ref(0)
@@ -697,13 +801,26 @@ const submitContact = async () => {
   }
 }
 
-// Pagination variables
+// Pagination
 const currentPage = ref(1)
 const postsPerPage = 10
 
-// Computed properties for pagination
-const totalPages = computed(() => Math.ceil(totalPostsCount.value / postsPerPage))
-const paginatedPosts = computed(() => posts.value)
+// Use filtered posts for pagination
+const postsToDisplay = computed(() => {
+  return filteredPosts.value.length > 0 || searchQuery.value || filterOption.value !== 'all' 
+    ? filteredPosts.value 
+    : posts.value
+})
+
+const totalPages = computed(() => {
+  return Math.ceil(postsToDisplay.value.length / postsPerPage)
+})
+
+const paginatedPosts = computed(() => {
+  const start = (currentPage.value - 1) * postsPerPage
+  const end = start + postsPerPage
+  return postsToDisplay.value.slice(start, end)
+})
 
 const countries = [
   'United States',
@@ -1103,6 +1220,103 @@ a:hover {
 .site-nav {
   display: flex;
   gap: 2rem;
+}
+
+/* Mobile navigation */
+.mobile-nav {
+  display: none;
+}
+
+.hamburger-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  width: 2rem;
+  height: 2rem;
+  position: relative;
+  z-index: 1001;
+}
+
+.hamburger-btn span {
+  width: 100%;
+  height: 3px;
+  background-color: white;
+  transition: all 0.3s ease;
+  transform-origin: center;
+}
+
+.hamburger-btn.active span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.hamburger-btn.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-btn.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(7px, -6px);
+}
+
+.mobile-menu {
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 250px;
+  height: 100vh;
+  background: #1B1B2A;
+  display: flex;
+  flex-direction: column;
+  padding: 4rem 2rem 2rem;
+  transition: right 0.3s ease;
+  z-index: 1000;
+  border-left: 2px solid #FF007A;
+}
+
+.mobile-menu.active {
+  right: 0;
+}
+
+.mobile-nav-link {
+  font-family: 'Bebas Neue', sans-serif;
+  color: white;
+  text-decoration: none;
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1rem 0;
+  border-bottom: 1px solid #333;
+  transition: color 0.3s ease;
+}
+
+.mobile-nav-link:hover {
+  color: #FF007A;
+}
+
+.mobile-nav-link:first-child {
+  color: #FF007A;
+  text-decoration: underline;
+}
+
+.mobile-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.3s ease;
+  z-index: 999;
+}
+
+.mobile-backdrop.active {
+  opacity: 1;
+  visibility: visible;
 }
 
 .nav-link {
@@ -1666,14 +1880,117 @@ main {
   border: 1px solid #444;
 }
 
-/* Responsive design for posts */
+/* Comprehensive Mobile Responsiveness */
 @media (max-width: 768px) {
+  /* MOBILE NAVIGATION - HIGHEST PRIORITY */
+  .desktop-nav,
+  .site-nav {
+    display: none !important;
+  }
+  
+  .mobile-nav {
+    display: block !important;
+  }
+  
+  /* Container and layout fixes */
+  .site-container {
+    max-width: 100%;
+    padding: 0 1rem;
+  }
+  
+  /* Header and navigation */
+  .site-header {
+    padding: 1rem;
+    justify-content: space-between;
+    align-items: center;
+  }
+  
+  .site-name {
+    font-size: 1.8rem;
+  }
+  
+  /* Hide desktop nav, show mobile hamburger */
+  .site-nav.desktop-nav {
+    display: none !important;
+  }
+  
+  .mobile-nav {
+    display: block !important;
+  }
+  
+  /* Ensure nav links are hidden on mobile */
+  .nav-link {
+    display: none !important;
+  }
+  
+  /* Fix container width and spacing */
+  .site-container {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+  
+  /* Better main content layout */
+  main {
+    padding: 0 1rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  /* Main content text scaling */
+  .main-blurb {
+    font-size: 1.8rem;
+    line-height: 2.2rem;
+    margin-left: 1rem;
+    margin-top: 1rem;
+    margin-bottom: 1rem;
+  }
+  
+  .main-blurb2 {
+    font-size: 1.8rem;
+    margin-left: 1rem;
+    margin-top: 0.5rem;
+    line-height: 1.4;
+    margin-bottom: 1rem;
+  }
+  
+  /* Fix MOM text overlap */
+  .blurb2 {
+    display: inline-block;
+    margin: 0 0.2rem;
+    line-height: 1.2;
+  }
+  
+  /* Form styling */
+  .post-form-container {
+    padding: 1rem;
+  }
+  
+  .post-title {
+    font-size: 2rem;
+    text-align: center;
+  }
+  
+  .form-input,
+  .form-textarea,
+  .form-select {
+    font-size: 1rem;
+  }
+  
+  .submit-btn {
+    font-size: 1.2rem;
+    padding: 1rem 2rem;
+  }
+  
+  /* Posts section */
   .posts-container {
     padding: 0 1rem;
   }
   
   .post-card {
     padding: 1rem;
+    margin-bottom: 1rem;
   }
   
   .post-header {
@@ -1683,9 +2000,10 @@ main {
   }
   
   .posts-title {
-    font-size: 36px;
+    font-size: 2rem;
   }
   
+  /* Pagination */
   .pagination {
     flex-direction: column;
     gap: 1rem;
@@ -1694,6 +2012,127 @@ main {
   .pagination-btn {
     min-width: 140px;
     padding: 1rem 1.5rem;
+    font-size: 1rem;
+  }
+  
+  /* About page */
+  .about-container {
+    padding: 1rem;
+  }
+  
+  .about-title {
+    font-size: 2rem;
+  }
+  
+  /* Contact page */
+  .contact-form-container {
+    padding: 1rem;
+  }
+  
+  /* Modal responsiveness */
+  .modal-content {
+    margin: 1rem;
+    max-width: calc(100% - 2rem);
+  }
+  
+  .modal-title {
+    font-size: 1.5rem;
+  }
+  
+  /* Notice section */
+  .main-postit {
+    margin: 1rem;
+    font-size: 0.9rem;
+    padding: 1rem;
+  }
+  
+  .postit2 {
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+  
+  /* Feed title */
+  .feed-title {
+    font-size: 2rem;
+  }
+}
+
+/* Extra small mobile devices */
+@media (max-width: 480px) {
+  .main-blurb {
+    font-size: 1.4rem;
+    line-height: 1.8rem;
+    margin-top: 0.5rem;
+  }
+  
+  .main-blurb2 {
+    font-size: 1.4rem;
+    line-height: 1.6rem;
+    margin-top: 0.25rem;
+  }
+  
+  .site-name {
+    font-size: 1.3rem;
+  }
+  
+  .nav-link {
+    font-size: 1rem;
+  }
+  
+  .post-title {
+    font-size: 1.3rem;
+  }
+  
+  .posts-title {
+    font-size: 1.3rem;
+  }
+  
+  .about-title {
+    font-size: 1.3rem;
+  }
+  
+  /* Better mobile spacing */
+  .site-container {
+    padding: 0 0.5rem;
+  }
+  
+  .main-postit {
+    margin: 0.5rem;
+    padding: 0.75rem;
+    font-size: 0.8rem;
+  }
+  
+  .postit2 {
+    font-size: 0.8rem;
+  }
+  
+  /* Improve MOM text on small screens */
+  .blurb2 {
+    margin: 0 0.1rem;
+    padding-bottom: 0;
+    border-bottom-width: 2px;
+  }
+  
+  /* Mobile search and filter bar */
+  .search-filter-bar {
+    flex-direction: column;
+    gap: 0.75rem;
+    margin: 1rem 0;
+    padding: 0.75rem;
+  }
+  
+  .search-container {
+    max-width: 100%;
+  }
+  
+  .search-input,
+  .filter-select {
+    font-size: 0.9rem;
+    padding: 0.6rem 2rem 0.6rem 0.8rem;
+  }
+  
+  .filter-select {
+    min-width: 100%;
   }
 }
 
@@ -1862,12 +2301,100 @@ img {
   margin-bottom: 2.5rem;
 }
 
-.modal-message {
+.modal-m.feed-subtitle {
   font-family: 'Nunito', sans-serif;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
+  color: #ccc;
+  margin-top: 0.5rem;
+  font-weight: 400;
+}
+
+/* Search and Filter Bar */
+.search-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 2rem auto 1.5rem auto;
+  padding: 1rem;
+  background-color: #2A2A3E;
+  border-radius: 12px;
+  border: 2px solid #444;
+  gap: 1rem;
+  max-width: 800px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.search-container {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  background-color: #1B1B2A;
+  border: 2px solid #555;
+  border-radius: 8px;
   color: white;
-  margin: 0 0 1rem 0;
-  line-height: 1.6;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #FF007A;
+  box-shadow: 0 0 0 3px rgba(255, 0, 122, 0.1);
+}
+
+.search-input::placeholder {
+  color: #888;
+}
+
+.search-icon {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #888;
+  pointer-events: none;
+  font-size: 1rem;
+}
+
+.filter-container {
+  position: relative;
+}
+
+.filter-select {
+  padding: 0.75rem 2.5rem 0.75rem 1rem;
+  background-color: #1B1B2A;
+  border: 2px solid #555;
+  border-radius: 8px;
+  color: white;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  appearance: none;
+  background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 4 5"><path fill="%23888" d="M2 0L0 2h4zm0 5L0 3h4z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 12px;
+  min-width: 180px;
+}
+
+.filter-select:focus {
+  outline: none;
+  border-color: #FF007A;
+  box-shadow: 0 0 0 3px rgba(255, 0, 122, 0.1);
+}
+
+.filter-select option {
+  background-color: #1B1B2A;
+  color: white;
+  padding: 0.5rem;
 }
 
 .modal-submessage {
