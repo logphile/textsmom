@@ -230,6 +230,14 @@
             <span class="search-icon">🔍</span>
           </div>
           
+          <button 
+            @click="showRandomPost" 
+            class="random-btn"
+            title="Show random post"
+          >
+            RANDOM
+          </button>
+          
           <div class="filter-container">
             <select v-model="filterOption" @change="filterPosts" class="filter-select">
               <option value="all">All Posts</option>
@@ -250,21 +258,67 @@
             <div class="post-content">{{ post.message }}</div>
             <div class="post-footer">
               <div class="post-timestamp">{{ formatDate(post.created_at) }}</div>
-              <div class="post-voting">
-                <button 
-                  @click="voteOnPost(post.id, 'up')"
-                  :class="['vote-btn', 'vote-up', { 'voted': hasUserVoted(post.id, 'up') }]"
-                  :disabled="isVoting"
-                >
-                  👍 <span class="vote-count">{{ post.likes || 0 }}</span>
-                </button>
-                <button 
-                  @click="voteOnPost(post.id, 'down')"
-                  :class="['vote-btn', 'vote-down', { 'voted': hasUserVoted(post.id, 'down') }]"
-                  :disabled="isVoting"
-                >
-                  👎 <span class="vote-count">{{ post.dislikes || 0 }}</span>
-                </button>
+              <div class="post-actions">
+                <!-- Report and Share Buttons -->
+                <div class="post-sharing">
+                  <button 
+                    @click="reportPost(post)"
+                    class="share-btn report-btn"
+                    title="Report this post"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                    </svg>
+                  </button>
+                  
+                  <div class="share-divider"></div>
+                  
+                  <button 
+                    @click="shareToTwitter(post)"
+                    class="share-btn share-twitter"
+                    title="Share on Twitter"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                    </svg>
+                  </button>
+                  <button 
+                    @click="shareToInstagram(post)"
+                    class="share-btn share-instagram"
+                    title="Share on Instagram"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    </svg>
+                  </button>
+                  <button 
+                    @click="copyPostLink(post)"
+                    class="share-btn share-copy"
+                    title="Copy link"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>
+                  </button>
+                </div>
+                
+                <!-- Voting Buttons -->
+                <div class="post-voting">
+                  <button 
+                    @click="voteOnPost(post.id, 'up')"
+                    :class="['vote-btn', 'vote-up', { 'voted': hasUserVoted(post.id, 'up') }]"
+                    :disabled="isVoting"
+                  >
+                    👍 <span class="vote-count">{{ post.likes || 0 }}</span>
+                  </button>
+                  <button 
+                    @click="voteOnPost(post.id, 'down')"
+                    :class="['vote-btn', 'vote-down', { 'voted': hasUserVoted(post.id, 'down') }]"
+                    :disabled="isVoting"
+                  >
+                    👎 <span class="vote-count">{{ post.dislikes || 0 }}</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -368,6 +422,62 @@
         </div>
         <div class="modal-actions">
           <button @click="closeModal" class="modal-btn modal-btn-primary">REVISE CONTENT</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Share Modal -->
+    <div v-if="showShareModal" class="modal-overlay" @click="closeShareModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <div class="warning-icon">✨</div>
+          <h2 class="modal-title">SHARE SUCCESS<span class="green-period">!</span></h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-message">{{ shareModalMessage }}</p>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeShareModal" class="modal-btn modal-btn-primary">AWESOME</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Report Modal -->
+    <div v-if="showReportModal" class="modal-overlay" @click="closeReportModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <div class="warning-icon">🛡️</div>
+          <h2 class="modal-title">REPORT POST<span class="green-period">.</span></h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-message">Why are you reporting this post?</p>
+          <div class="report-reasons">
+            <button @click="submitReport('inappropriate')" class="report-reason-btn">Inappropriate Content</button>
+            <button @click="submitReport('spam')" class="report-reason-btn">Spam</button>
+            <button @click="submitReport('harassment')" class="report-reason-btn">Harassment</button>
+            <button @click="submitReport('fake')" class="report-reason-btn">Fake/Misleading</button>
+            <button @click="submitReport('other')" class="report-reason-btn">Other</button>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeReportModal" class="modal-btn modal-btn-secondary">CANCEL</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Report Success Modal -->
+    <div v-if="showReportSuccessModal" class="modal-overlay" @click="closeReportSuccessModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <div class="success-icon">✅</div>
+          <h2 class="modal-title">REPORT SUBMITTED<span class="green-period">!</span></h2>
+        </div>
+        <div class="modal-body">
+          <p class="modal-message">Thank you for helping keep our community safe!</p>
+          <p class="modal-submessage">We'll review this post and take appropriate action if needed. Your report helps us maintain a positive environment for everyone.</p>
+        </div>
+        <div class="modal-actions">
+          <button @click="closeReportSuccessModal" class="modal-btn modal-btn-primary">UNDERSTOOD</button>
         </div>
       </div>
     </div>
@@ -618,6 +728,110 @@ const closeMobileMenu = () => {
   showMobileMenu.value = false
 }
 
+// Share functionality
+const shareToTwitter = (post) => {
+  const text = `Check out this hilarious mom text from ${post.name}: "${post.message.substring(0, 100)}${post.message.length > 100 ? '...' : ''}" 😂`
+  const url = `https://texts.mom`
+  const hashtags = 'momtexts,unhinged,texts'
+  const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}&hashtags=${hashtags}`
+  window.open(twitterUrl, '_blank', 'width=550,height=420')
+}
+
+const shareToInstagram = (post) => {
+  // Instagram doesn't have direct sharing API, so we'll copy text and open Instagram
+  const text = `Check out this hilarious mom text: "${post.message}" 😂\n\nShare your mom texts at texts.mom\n\n#momtexts #unhinged #texts #mom`
+  
+  // Copy to clipboard
+  navigator.clipboard.writeText(text).then(() => {
+    // Show success message
+    showShareModal.value = true
+    shareModalMessage.value = 'Text copied! Open Instagram and paste it in your story or post. 📷'
+  }).catch(() => {
+    // Fallback for older browsers
+    showShareModal.value = true
+    shareModalMessage.value = 'Copy this text and share it on Instagram: ' + text
+  })
+}
+
+const copyPostLink = (post) => {
+  const postUrl = `https://texts.mom#post-${post.id}`
+  
+  navigator.clipboard.writeText(postUrl).then(() => {
+    showShareModal.value = true
+    shareModalMessage.value = 'Link copied to clipboard! 🔗'
+  }).catch(() => {
+    // Fallback for older browsers
+    showShareModal.value = true
+    shareModalMessage.value = `Copy this link: ${postUrl}`
+  })
+}
+
+// Share modal state
+const showShareModal = ref(false)
+const shareModalMessage = ref('')
+
+const closeShareModal = () => {
+  showShareModal.value = false
+  shareModalMessage.value = ''
+}
+
+// Report functionality
+const reportPost = (post) => {
+  // Show report modal with post details
+  reportedPost.value = post
+  showReportModal.value = true
+}
+
+const submitReport = async (reason) => {
+  try {
+    // Send report to backend API for email notification
+    const response = await $fetch('/api/report-post', {
+      method: 'POST',
+      body: {
+        postId: reportedPost.value.id,
+        postContent: reportedPost.value.message,
+        postAuthor: reportedPost.value.name,
+        postLocation: reportedPost.value.location,
+        reportReason: reason,
+        reporterInfo: {
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        }
+      }
+    })
+    
+    console.log('Report submitted successfully:', response)
+    
+    // Show dedicated report success modal
+    showReportModal.value = false
+    showReportSuccessModal.value = true
+    
+    // Reset reported post
+    reportedPost.value = null
+  } catch (error) {
+    console.error('Error reporting post:', error)
+    
+    // Show error message
+    showReportModal.value = false
+    showShareModal.value = true
+    shareModalMessage.value = 'Error submitting report. Please try again later.'
+  }
+}
+
+// Report modal state
+const showReportModal = ref(false)
+const showReportSuccessModal = ref(false)
+const reportedPost = ref(null)
+
+const closeReportModal = () => {
+  showReportModal.value = false
+  reportedPost.value = null
+}
+
+const closeReportSuccessModal = () => {
+  showReportSuccessModal.value = false
+}
+
 // Search and filter functionality
 const searchQuery = ref('')
 const filterOption = ref('all')
@@ -666,6 +880,42 @@ watch(posts, (newPosts) => {
   }
 }, { immediate: true })
 
+// Random post functionality
+const showRandomPost = () => {
+  const availablePosts = postsToDisplay.value
+  
+  if (availablePosts.length === 0) {
+    showShareModal.value = true
+    shareModalMessage.value = 'No posts available for random selection. Try adjusting your search or filter!'
+    return
+  }
+  
+  // Get random post
+  const randomIndex = Math.floor(Math.random() * availablePosts.length)
+  const randomPost = availablePosts[randomIndex]
+  
+  // Clear search and filters to show all posts
+  searchQuery.value = ''
+  filterOption.value = 'all'
+  filteredPosts.value = [...posts.value]
+  
+  // Find the page that contains this post
+  const postIndex = posts.value.findIndex(post => post.id === randomPost.id)
+  const targetPage = Math.floor(postIndex / postsPerPage) + 1
+  
+  // Navigate to that page
+  currentPage.value = targetPage
+  
+  // Show success message
+  showShareModal.value = true
+  shareModalMessage.value = `Found a random post by ${randomPost.name}! 🎲`
+  
+  // Scroll to top to show the posts
+  setTimeout(() => {
+    document.querySelector('.posts-section')?.scrollIntoView({ behavior: 'smooth' })
+  }, 500)
+}
+
 // Phase 1 Moderation: Rate limiting and profanity filter
 const isSubmitting = ref(false)
 const lastSubmissionTime = ref(0)
@@ -673,7 +923,7 @@ const RATE_LIMIT_SECONDS = 30
 
 // Basic profanity word list for client-side filtering
 const profanityWords = [
-  'fuck', 'faggot', 'nigger', 'kill', 'die', 'suicide'
+  'faggot', 'nigger', 'suicide'
 ]
 
 // Function to check for profanity
@@ -1219,7 +1469,7 @@ a:hover {
 /* Navigation menu styling */
 .site-nav {
   display: flex;
-  gap: 2rem;
+  gap: 1rem;
 }
 
 /* Mobile navigation */
@@ -1808,16 +2058,146 @@ main {
   text-align: center;
 }
 
-/* Responsive voting buttons */
+/* Post Actions Layout */
+.post-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+/* Share Buttons */
+.post-sharing {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.share-btn {
+  background-color: #2A2A3E;
+  border: 2px solid #555;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 0.5rem 0.75rem;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 40px;
+}
+
+.share-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.share-twitter:hover {
+  border-color: #1DA1F2;
+  background-color: rgba(29, 161, 242, 0.1);
+  color: #1DA1F2;
+}
+
+.share-instagram:hover {
+  border-color: #E4405F;
+  background-color: rgba(228, 64, 95, 0.1);
+  color: #E4405F;
+}
+
+.share-copy:hover {
+  border-color: #00FFB3;
+  background-color: rgba(0, 255, 179, 0.1);
+  color: #00FFB3;
+}
+
+.report-btn:hover {
+  border-color: #FF6B6B;
+  background-color: rgba(255, 107, 107, 0.1);
+  color: #FF6B6B;
+}
+
+/* Share divider */
+.share-divider {
+  width: 1px;
+  height: 24px;
+  background-color: #555;
+  margin: 0 0.5rem;
+}
+
+/* Report modal styling */
+.report-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.report-reason-btn {
+  background-color: #2A2A3E;
+  border: 2px solid #555;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  font-family: 'Nunito', sans-serif;
+  font-size: 1rem;
+  padding: 0.75rem 1rem;
+  text-align: left;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.report-reason-btn:hover {
+  border-color: #FF6B6B;
+  background-color: rgba(255, 107, 107, 0.1);
+  color: #FF6B6B;
+  transform: translateY(-1px);
+}
+
+.modal-btn-secondary {
+  background-color: #555;
+  border: 2px solid #777;
+  color: #ccc;
+}
+
+.modal-btn-secondary:hover {
+  background-color: #666;
+  border-color: #888;
+  color: white;
+}
+
+/* Responsive voting buttons and share buttons */
 @media (max-width: 768px) {
   .post-footer {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.5rem;
+    gap: 0.75rem;
+  }
+  
+  .post-actions {
+    width: 100%;
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  
+  .post-sharing {
+    justify-content: center;
+    order: 2;
   }
   
   .post-voting {
-    align-self: flex-end;
+    justify-content: center;
+    order: 1;
+  }
+  
+  .share-btn {
+    padding: 0.4rem 0.6rem;
+    font-size: 1rem;
+    min-width: 36px;
+    height: 36px;
   }
   
   .vote-btn {
@@ -2123,6 +2503,18 @@ main {
   
   .search-container {
     max-width: 100%;
+    order: 1;
+  }
+  
+  .random-btn {
+    order: 2;
+    min-width: 100%;
+    font-size: 0.9rem;
+    padding: 0.6rem 1rem;
+  }
+  
+  .filter-container {
+    order: 3;
   }
   
   .search-input,
@@ -2319,7 +2711,7 @@ img {
   background-color: #2A2A3E;
   border-radius: 12px;
   border: 2px solid #444;
-  gap: 1rem;
+  gap: 0.5rem;
   max-width: 800px;
   width: 100%;
   box-sizing: border-box;
@@ -2327,8 +2719,8 @@ img {
 
 .search-container {
   position: relative;
-  flex: 1;
-  max-width: 300px;
+  flex: 2;
+  min-width: 200px;
 }
 
 .search-input {
@@ -2395,6 +2787,33 @@ img {
   background-color: #1B1B2A;
   color: white;
   padding: 0.5rem;
+}
+
+/* Random Button */
+.random-btn {
+  background-color: #2A2A3E;
+  border: 2px solid #00FFB3;
+  border-radius: 8px;
+  color: #00FFB3;
+  cursor: pointer;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1rem;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+  flex: 1;
+  justify-content: center;
+}
+
+.random-btn:hover {
+  background-color: #00FFB3;
+  color: #1B1B2A;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(0, 255, 179, 0.3);
 }
 
 .modal-submessage {
