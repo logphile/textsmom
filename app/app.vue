@@ -1266,17 +1266,20 @@ const viewHomepage = async () => {
 }
 
 // Load posts from Supabase
-const loadPosts = async (page = 1) => {
+const loadPosts = async () => {
   isLoading.value = true
-  currentPage.value = page
   
   try {
-    
-    const { posts: fetchedPosts, totalCount, error } = await fetchPosts(page, postsPerPage)
+    console.log('Loading all posts...')
+    // Load ALL posts at once for client-side pagination
+    const { data, error, count } = await supabase
+      .from('posts')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
     
     if (error) {
-      console.error('Error loading posts:', error)
-      // Fallback to sample posts if Supabase fails
+      console.error('Error fetching posts from Supabase:', error)
+      // Fallback to sample data
       posts.value = [
         {
           id: 1,
@@ -1304,8 +1307,8 @@ const loadPosts = async (page = 1) => {
       return
     }
     
-    posts.value = fetchedPosts
-    totalPostsCount.value = totalCount
+    posts.value = data || []
+    totalPostsCount.value = count || 0
     
   } catch (error) {
     console.error('Error loading posts:', error)
@@ -1317,22 +1320,22 @@ const loadPosts = async (page = 1) => {
   }
 }
 
-// Pagination functions
-const nextPage = async () => {
+// Pagination functions for client-side pagination
+const nextPage = () => {
   if (currentPage.value < totalPages.value) {
-    await loadPosts(currentPage.value + 1)
+    currentPage.value++
   }
 }
 
-const previousPage = async () => {
+const previousPage = () => {
   if (currentPage.value > 1) {
-    await loadPosts(currentPage.value - 1)
+    currentPage.value--
   }
 }
 
 // Load posts when component mounts
 onMounted(() => {
-  loadPosts(1)
+  loadPosts()
 })
 
 // Helper function to format dates
