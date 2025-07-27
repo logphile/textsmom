@@ -250,7 +250,7 @@
         </div>
         
         <div class="posts-container">
-          <div v-for="post in paginatedPosts" :key="post.id" class="post-card">
+          <div v-for="(post, index) in paginatedPosts" :key="post.id" :class="['post-card', 'chat-bubble', index % 2 === 0 ? 'chat-left' : 'chat-right']">
             <div class="post-header">
               <span class="post-author">{{ post.name }}</span>
               <span class="post-location">{{ post.location }}</span>
@@ -1936,17 +1936,87 @@ main {
   padding: 0 2rem;
 }
 
+/* Chat Bubble Base Styling */
 .post-card {
   background-color: #2A2A3E;
-  border-radius: 12px;
+  border-radius: 18px;
   padding: 1.5rem;
-  border-left: 4px solid #FF007A;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  max-width: 85%;
+  word-wrap: break-word;
 }
 
 .post-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(255, 0, 122, 0.15);
+}
+
+/* Chat Bubble Left (Even posts) */
+.chat-left {
+  align-self: flex-start;
+  background-color: #2A2A3E;
+  border: 2px solid #FF007A;
+  margin-right: auto;
+  margin-left: 0;
+}
+
+/* Chat Bubble Right (Odd posts) */
+.chat-right {
+  align-self: flex-end;
+  background-color: #1B4B3A;
+  border: 2px solid #00FFB3;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+/* Chat Bubble Tails */
+.chat-left::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 20px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 12px 12px 12px 0;
+  border-color: transparent #FF007A transparent transparent;
+}
+
+.chat-left::after {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 22px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 10px 10px 10px 0;
+  border-color: transparent #2A2A3E transparent transparent;
+}
+
+.chat-right::before {
+  content: '';
+  position: absolute;
+  right: -12px;
+  top: 20px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 12px 0 12px 12px;
+  border-color: transparent transparent transparent #00FFB3;
+}
+
+.chat-right::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: 22px;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 10px 0 10px 10px;
+  border-color: transparent transparent transparent #1B4B3A;
 }
 
 .post-header {
@@ -2477,6 +2547,39 @@ main {
   /* Better mobile spacing */
   .site-container {
     padding: 0 0.5rem;
+  }
+  
+  /* Mobile chat bubbles */
+  .post-card {
+    max-width: 95%;
+    padding: 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .posts-container {
+    padding: 0 0.5rem;
+    gap: 1rem;
+  }
+  
+  /* Adjust chat bubble tails for mobile */
+  .chat-left::before {
+    left: -10px;
+    border-width: 10px 10px 10px 0;
+  }
+  
+  .chat-left::after {
+    left: -7px;
+    border-width: 8px 8px 8px 0;
+  }
+  
+  .chat-right::before {
+    right: -10px;
+    border-width: 10px 0 10px 10px;
+  }
+  
+  .chat-right::after {
+    right: -7px;
+    border-width: 8px 0 8px 8px;
   }
   
   .main-postit {
