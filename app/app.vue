@@ -3118,6 +3118,7 @@ img {
   color: white;
   margin-bottom: 1rem;
   word-wrap: break-word;
+  text-align: left;
 }
 
 .random-post-bubble .post-footer {
