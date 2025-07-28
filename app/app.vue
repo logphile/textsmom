@@ -481,6 +481,35 @@
         </div>
       </div>
     </div>
+    
+    <!-- Random Post Modal -->
+    <div v-if="showRandomPostModal" class="modal-overlay" @click="closeRandomPostModal">
+      <div class="modal-content random-post-modal" @click.stop>
+        <div class="modal-header">
+          <div class="random-icon">🎲</div>
+          <h2 class="modal-title">RANDOM MOM TEXT<span class="green-period">!</span></h2>
+        </div>
+        <div class="modal-body" v-if="currentRandomPost">
+          <!-- Display the random post in chat bubble style -->
+          <div class="random-post-display">
+            <div class="random-post-bubble chat-bubble chat-left">
+              <div class="post-header">
+                <span class="post-author">{{ currentRandomPost.name }}</span>
+                <span class="post-location">{{ currentRandomPost.location }}</span>
+              </div>
+              <div class="post-content">{{ currentRandomPost.message }}</div>
+              <div class="post-footer">
+                <div class="post-timestamp">{{ formatDate(currentRandomPost.created_at) }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button @click="getAnotherRandomPost" class="modal-btn modal-btn-secondary">ANOTHER RANDOM POST</button>
+          <button @click="closeRandomPostModal" class="modal-btn modal-btn-primary">CLOSE</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -823,6 +852,10 @@ const showReportModal = ref(false)
 const showReportSuccessModal = ref(false)
 const reportedPost = ref(null)
 
+// Random post modal state
+const showRandomPostModal = ref(false)
+const currentRandomPost = ref(null)
+
 const closeReportModal = () => {
   showReportModal.value = false
   reportedPost.value = null
@@ -894,26 +927,36 @@ const showRandomPost = () => {
   const randomIndex = Math.floor(Math.random() * availablePosts.length)
   const randomPost = availablePosts[randomIndex]
   
-  // Clear search and filters to show all posts
-  searchQuery.value = ''
-  filterOption.value = 'all'
-  filteredPosts.value = [...posts.value]
+  // Set the current random post and show modal
+  currentRandomPost.value = randomPost
+  showRandomPostModal.value = true
+}
+
+// Get another random post (for the modal button)
+const getAnotherRandomPost = () => {
+  const availablePosts = postsToDisplay.value
   
-  // Find the page that contains this post
-  const postIndex = posts.value.findIndex(post => post.id === randomPost.id)
-  const targetPage = Math.floor(postIndex / postsPerPage) + 1
+  if (availablePosts.length === 0) {
+    return
+  }
   
-  // Navigate to that page
-  currentPage.value = targetPage
+  // Get a different random post (not the same as current)
+  let randomIndex
+  let randomPost
   
-  // Show success message
-  showShareModal.value = true
-  shareModalMessage.value = `Found a random post by ${randomPost.name}! 🎲`
+  do {
+    randomIndex = Math.floor(Math.random() * availablePosts.length)
+    randomPost = availablePosts[randomIndex]
+  } while (randomPost.id === currentRandomPost.value?.id && availablePosts.length > 1)
   
-  // Scroll to top to show the posts
-  setTimeout(() => {
-    document.querySelector('.posts-section')?.scrollIntoView({ behavior: 'smooth' })
-  }, 500)
+  // Update the current random post
+  currentRandomPost.value = randomPost
+}
+
+// Close random post modal
+const closeRandomPostModal = () => {
+  showRandomPostModal.value = false
+  currentRandomPost.value = null
 }
 
 // Phase 1 Moderation: Rate limiting and profanity filter
@@ -3009,6 +3052,101 @@ img {
   font-size: 0.9rem;
   color: #00FFB3;
   opacity: 0.8;
+}
+
+/* Random Post Modal Styling */
+.random-post-modal {
+  max-width: 600px;
+  width: 90%;
+}
+
+.random-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.random-post-display {
+  margin: 1.5rem 0;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.random-post-bubble {
+  max-width: 100%;
+  margin: 0;
+  position: relative;
+  background-color: #2A2A3E;
+  border: 2px solid #FF007A;
+  border-radius: 18px;
+  padding: 1.5rem;
+  word-wrap: break-word;
+}
+
+/* Remove the chat bubble tail in modal for cleaner look */
+.random-post-bubble::before,
+.random-post-bubble::after {
+  display: none;
+}
+
+.random-post-bubble .post-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.random-post-bubble .post-author {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  color: #FF007A;
+  letter-spacing: 0.05em;
+}
+
+.random-post-bubble .post-location {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
+  color: #00FFB3;
+  font-weight: 600;
+}
+
+.random-post-bubble .post-content {
+  font-family: 'Nunito', sans-serif;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: white;
+  margin-bottom: 1rem;
+  word-wrap: break-word;
+}
+
+.random-post-bubble .post-footer {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.random-post-bubble .post-timestamp {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.85rem;
+  color: #888;
+}
+
+/* Mobile responsive for random post modal */
+@media (max-width: 768px) {
+  .random-post-modal {
+    width: 95%;
+    margin: 1rem;
+  }
+  
+  .random-post-bubble {
+    padding: 1rem;
+    font-size: 0.9rem;
+  }
+  
+  .random-post-bubble .post-author {
+    font-size: 1.2rem;
+  }
 }
 
 </style>
