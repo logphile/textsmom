@@ -585,7 +585,9 @@ useHead({
     { name: 'application-name', content: 'TextsMom' },
     { name: 'apple-mobile-web-app-title', content: 'TextsMom' },
     { name: 'apple-mobile-web-app-capable', content: 'yes' },
-    { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
+    { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+    { name: 'mobile-web-app-capable', content: 'yes' },
+    { name: 'apple-touch-fullscreen', content: 'yes' },
     { name: 'format-detection', content: 'telephone=no' },
     { name: 'generator', content: 'Nuxt.js' }
   ],
