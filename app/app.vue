@@ -10,6 +10,7 @@
       
       <!-- Desktop Navigation -->
       <nav class="site-nav desktop-nav">
+        <button @click="scrollToTexts" class="nav-link nav-link-texts">THE TEXTS</button>
         <NuxtLink to="/post" class="nav-link nav-link-post">POST!</NuxtLink>
         <NuxtLink to="/about" class="nav-link">ABOUT</NuxtLink>
         <NuxtLink to="/contact" class="nav-link">CONTACT</NuxtLink>
@@ -27,6 +28,7 @@
         <div class="mobile-backdrop" :class="{ 'active': showMobileMenu }" @click="closeMobileMenu"></div>
         
         <nav class="mobile-menu" :class="{ 'active': showMobileMenu }">
+          <button @click="scrollToTexts; closeMobileMenu()" class="mobile-nav-link mobile-nav-link-texts">THE TEXTS</button>
           <NuxtLink to="/post" class="mobile-nav-link" @click="closeMobileMenu">POST!</NuxtLink>
           <NuxtLink to="/about" class="mobile-nav-link" @click="closeMobileMenu">ABOUT</NuxtLink>
           <NuxtLink to="/contact" class="mobile-nav-link" @click="closeMobileMenu">CONTACT</NuxtLink>
@@ -206,7 +208,7 @@
       </div>
       
       <!-- Posts Section -->
-      <div v-if="posts.length > 0" class="posts-section">
+      <div v-if="posts.length > 0" id="posts-section" class="posts-section">
         <hr class="site-hr">
         <div class="feed-title-container">
           <div class="feed-title-main">
@@ -757,6 +759,29 @@ const toggleMobileMenu = () => {
 
 const closeMobileMenu = () => {
   showMobileMenu.value = false
+}
+
+// Scroll to texts section
+const scrollToTexts = () => {
+  // First navigate to homepage if not already there
+  if (window.location.pathname !== '/') {
+    navigateTo('/')
+    // Wait for navigation to complete, then scroll
+    nextTick(() => {
+      setTimeout(() => {
+        const postsSection = document.getElementById('posts-section')
+        if (postsSection) {
+          postsSection.scrollIntoView({ behavior: 'smooth' })
+        }
+      }, 100)
+    })
+  } else {
+    // Already on homepage, just scroll
+    const postsSection = document.getElementById('posts-section')
+    if (postsSection) {
+      postsSection.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
 }
 
 // Share functionality
@@ -1741,6 +1766,25 @@ a:hover {
   text-decoration: underline;
 }
 
+.mobile-nav-link-texts {
+  color: #00FFB3 !important;
+  background: none;
+  border: none;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 1rem 0;
+  border-bottom: 1px solid #333;
+  transition: color 0.3s ease;
+}
+
+.mobile-nav-link-texts:hover {
+  color: white !important;
+}
+
 .mobile-backdrop {
   position: fixed;
   top: 0;
@@ -1782,6 +1826,23 @@ a:hover {
 .nav-link-post:hover {
   color: #ff4da6;
   border-bottom-color: #ff4da6;
+}
+
+.nav-link-texts {
+  color: #00FFB3;
+  background: none;
+  border: none;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.2rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color 0.3s ease;
+  text-decoration: none;
+}
+
+.nav-link-texts:hover {
+  color: white;
 }
 
 /* Main content styling */
