@@ -181,7 +181,7 @@
           <p>She means well<span class="green-period">.</span> She really does<span class="green-period">.</span></p>
           <p>But somewhere between the missed punctuation, the all-caps threats, the cryptic emojis, and the "who is this" follow-ups… something unravels<span class="green-period">.</span></p>
           
-          <p>texts<span class="green-period">.</span>mom is a shrine to the glorious dysfunction of modern motherhood—one, unhinged message at a time<span class="green-period">.</span></p>
+          <p>Texts<span class="green-period">.</span>mom is a shrine to the glorious dysfunction of modern motherhood—one, unhinged message at a time<span class="green-period">.</span></p>
           <p>We don't judge<span class="green-period">.</span> Okay, maybe a little<span class="green-period">.</span> We just document<span class="green-period">.</span></p>
           <p>Whether it's passive-aggressive guilt, baffling autocorrects, or love disguised as psychological warfare, if she texted it—you can post it<span class="green-period">.</span></p>
           
