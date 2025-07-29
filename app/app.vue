@@ -1021,7 +1021,7 @@ const voteOnPost = async (postId, voteType) => {
     }
     
     // Refresh posts to show updated counts
-    await loadPosts(currentPage.value)
+    await loadPosts()
     
   } catch (error) {
     console.error('Error voting on post:', error)
