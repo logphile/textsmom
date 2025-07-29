@@ -999,32 +999,89 @@ const checkRateLimit = () => {
 const voteOnPost = async (postId, voteType) => {
   if (isVoting.value) return
   
+  console.log(`Voting on post ${postId} with type ${voteType}`)
   isVoting.value = true
   
   try {
     // Check if user has already voted on this post
     const existingVote = userVotes.value.get(postId)
+    console.log(`Existing vote for post ${postId}:`, existingVote)
     
     // If user clicks the same vote type they already voted, remove the vote
     if (existingVote === voteType) {
+      console.log(`Removing existing ${voteType} vote for post ${postId}`)
       await removeVote(postId, voteType)
       userVotes.value.delete(postId)
     } else {
       // If user had a different vote, remove it first
       if (existingVote) {
+        console.log(`Removing existing ${existingVote} vote before adding ${voteType} vote`)
         await removeVote(postId, existingVote)
       }
       
       // Add the new vote
+      console.log(`Adding ${voteType} vote for post ${postId}`)
       await addVote(postId, voteType)
       userVotes.value.set(postId, voteType)
     }
     
-    // Refresh posts to show updated counts
-    await loadPosts()
+    // Update UI to reflect the database changes (sync with what was sent to DB)
+    console.log('Syncing UI with database changes...')
+    
+    // Get the expected final values based on what we sent to the database
+    let expectedLikes, expectedDislikes
+    
+    // Find the current post to get baseline values
+    const currentPost = posts.value.find(p => p.id === postId)
+    if (currentPost) {
+      expectedLikes = currentPost.likes || 0
+      expectedDislikes = currentPost.dislikes || 0
+      
+      // Apply the same logic that was sent to the database
+      if (existingVote === voteType) {
+        // Removing vote - decrement the appropriate column
+        if (voteType === 'up') {
+          expectedLikes = Math.max(expectedLikes - 1, 0)
+        } else {
+          expectedDislikes = Math.max(expectedDislikes - 1, 0)
+        }
+      } else {
+        // Adding vote - first remove existing vote if any, then add new vote
+        if (existingVote === 'up') {
+          expectedLikes = Math.max(expectedLikes - 1, 0)
+        } else if (existingVote === 'down') {
+          expectedDislikes = Math.max(expectedDislikes - 1, 0)
+        }
+        
+        // Add the new vote
+        if (voteType === 'up') {
+          expectedLikes += 1
+        } else {
+          expectedDislikes += 1
+        }
+      }
+      
+      // Update both posts arrays with the expected final values
+      const postIndex = posts.value.findIndex(p => p.id === postId)
+      if (postIndex !== -1) {
+        posts.value[postIndex].likes = expectedLikes
+        posts.value[postIndex].dislikes = expectedDislikes
+        console.log(`Updated post ${postId} in posts array: likes=${expectedLikes}, dislikes=${expectedDislikes}`)
+      }
+      
+      const filteredIndex = filteredPosts.value.findIndex(p => p.id === postId)
+      if (filteredIndex !== -1) {
+        filteredPosts.value[filteredIndex].likes = expectedLikes
+        filteredPosts.value[filteredIndex].dislikes = expectedDislikes
+        console.log(`Updated post ${postId} in filteredPosts array: likes=${expectedLikes}, dislikes=${expectedDislikes}`)
+      }
+    }
+    
+    console.log('UI synchronized with database changes')
     
   } catch (error) {
     console.error('Error voting on post:', error)
+    alert(`Voting failed: ${error.message}`)
   } finally {
     isVoting.value = false
   }
@@ -1032,27 +1089,93 @@ const voteOnPost = async (postId, voteType) => {
 
 const addVote = async (postId, voteType) => {
   const column = voteType === 'up' ? 'likes' : 'dislikes'
+  console.log(`Adding vote: postId=${postId}, column=${column}`)
+  
+  // First get the current value
+  const { data: currentPost, error: fetchError } = await supabase
+    .from('posts')
+    .select(column)
+    .eq('id', postId)
+    .single()
+  
+  if (fetchError) {
+    console.error('Error fetching current post for voting:', fetchError)
+    throw fetchError
+  }
+  
+  console.log(`Current ${column} value:`, currentPost[column])
+  
+  // Then update with incremented value
+  const newValue = (currentPost[column] || 0) + 1
+  console.log(`Updating ${column} to:`, newValue)
   
   const { error } = await supabase
     .from('posts')
-    .update({ [column]: supabase.raw(`${column} + 1`) })
+    .update({ [column]: newValue })
     .eq('id', postId)
   
   if (error) {
+    console.error('Error updating vote count:', error)
     throw error
+  }
+  
+  console.log(`Successfully updated ${column} to ${newValue} for post ${postId}`)
+  
+  // Verify the update by fetching the post again
+  const { data: verifyPost, error: verifyError } = await supabase
+    .from('posts')
+    .select(column)
+    .eq('id', postId)
+    .single()
+  
+  if (!verifyError && verifyPost) {
+    console.log(`Verification: ${column} is now ${verifyPost[column]} in database`)
   }
 }
 
 const removeVote = async (postId, voteType) => {
   const column = voteType === 'up' ? 'likes' : 'dislikes'
+  console.log(`Removing vote: postId=${postId}, column=${column}`)
+  
+  // First get the current value
+  const { data: currentPost, error: fetchError } = await supabase
+    .from('posts')
+    .select(column)
+    .eq('id', postId)
+    .single()
+  
+  if (fetchError) {
+    console.error('Error fetching current post for vote removal:', fetchError)
+    throw fetchError
+  }
+  
+  console.log(`Current ${column} value:`, currentPost[column])
+  
+  // Then update with decremented value (minimum 0)
+  const newValue = Math.max((currentPost[column] || 0) - 1, 0)
+  console.log(`Updating ${column} to:`, newValue)
   
   const { error } = await supabase
     .from('posts')
-    .update({ [column]: supabase.raw(`GREATEST(${column} - 1, 0)`) })
+    .update({ [column]: newValue })
     .eq('id', postId)
   
   if (error) {
+    console.error('Error updating vote count:', error)
     throw error
+  }
+  
+  console.log(`Successfully updated ${column} to ${newValue} for post ${postId}`)
+  
+  // Verify the update by fetching the post again
+  const { data: verifyPost, error: verifyError } = await supabase
+    .from('posts')
+    .select(column)
+    .eq('id', postId)
+    .single()
+  
+  if (!verifyError && verifyPost) {
+    console.log(`Verification: ${column} is now ${verifyPost[column]} in database`)
   }
 }
 
@@ -1322,32 +1445,51 @@ const loadPosts = async () => {
     
     if (error) {
       console.error('Error fetching posts from Supabase:', error)
-      // Fallback to sample data
+      // Fallback to sample data with vote counts
       posts.value = [
         {
           id: 1,
           name: 'Sarah',
           message: 'honey can you pick up some milk on your way home also your father says the lawn mower is broken again and we need to call someone but I dont know who to call do you know anyone',
           location: 'California, United States',
-          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString()
+          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+          likes: 0,
+          dislikes: 0
         },
         {
           id: 2,
           name: 'Mike',
           message: 'Mom just texted: "The internet is down. How do I fix it? Also, what\'s my password for the email? And can you come over this weekend to help me with the TV remote? It\'s not working right."',
           location: 'Texas, United States',
-          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString()
+          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+          likes: 0,
+          dislikes: 0
         },
         {
           id: 3,
           name: 'Jessica',
           message: 'call me when you get this its important but not an emergency but kind of urgent but dont worry its nothing serious just call me ok love you',
           location: 'Ontario, Canada',
-          created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()
+          created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+          likes: 0,
+          dislikes: 0
         }
       ]
       totalPostsCount.value = 3
       return
+    }
+    
+    console.log('Posts loaded from Supabase:', data?.length || 0, 'posts')
+    if (data && data.length > 0) {
+      console.log('Sample post data:', data[0])
+      const post68 = data.find(p => p.id === 68)
+      console.log('Post 68 data:', post68)
+      if (post68) {
+        console.log('Post 68 likes:', post68.likes, 'dislikes:', post68.dislikes)
+      } else {
+        console.log('Post 68 not found in loaded data')
+        console.log('Available post IDs:', data.map(p => p.id))
+      }
     }
     
     posts.value = data || []
