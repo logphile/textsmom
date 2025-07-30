@@ -1563,6 +1563,29 @@ const formatDate = (dateString) => {
 </script>
 
 <style>
+/* Pulse animations for chat bubbles */
+@keyframes pulseGreen {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(0, 255, 179, 0.3), 0 0 15px rgba(0, 255, 179, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(0, 255, 179, 0.6), 0 0 25px rgba(0, 255, 179, 0.4);
+    transform: scale(1.02);
+  }
+}
+
+@keyframes pulsePink {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(255, 0, 122, 0.3), 0 0 15px rgba(255, 0, 122, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 4px 16px rgba(255, 0, 122, 0.6), 0 0 25px rgba(255, 0, 122, 0.4);
+    transform: scale(1.02);
+  }
+}
+
 /* Base typography setup */
 body {
   background-color: #1B1B2A;
@@ -1767,8 +1790,8 @@ a:hover {
 }
 
 .mobile-nav-link-texts {
-  color: #00FFB3 !important;
-  background: none;
+  color: white !important;
+  background: #00FFB3;
   border: none;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 1.5rem;
@@ -1776,13 +1799,38 @@ a:hover {
   text-transform: uppercase;
   cursor: pointer;
   text-decoration: none;
-  padding: 1rem 0;
-  border-bottom: 1px solid #333;
-  transition: color 0.3s ease;
+  padding: 0.7rem 1rem;
+  margin: 0.5rem 0 0.5rem 12px;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(0, 255, 179, 0.3);
+  transition: all 0.3s ease;
+  border-bottom: none;
+  position: relative;
+}
+
+.mobile-nav-link-texts::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 8px solid #00FFB3;
+  transition: border-right-color 0.3s ease;
 }
 
 .mobile-nav-link-texts:hover {
-  color: white !important;
+  background: white !important;
+  color: #00FFB3 !important;
+  box-shadow: 0 3px 8px rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.mobile-nav-link-texts:hover::before {
+  border-right-color: white;
 }
 
 .mobile-backdrop {
@@ -1818,31 +1866,91 @@ a:hover {
 }
 
 .nav-link-post {
-  color: #FF007A;
-  text-decoration: none;
-  border-bottom: 2px solid #FF007A;
-}
-
-.nav-link-post:hover {
-  color: #ff4da6;
-  border-bottom-color: #ff4da6;
-}
-
-.nav-link-texts {
-  color: #00FFB3;
-  background: none;
+  color: white;
+  background: #FF007A;
   border: none;
   font-family: 'Bebas Neue', sans-serif;
   font-size: 2.2rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   cursor: pointer;
-  transition: color 0.3s ease;
+  transition: all 0.3s ease;
   text-decoration: none;
+  padding: 0.5rem 1.2rem;
+  border-radius: 25px;
+  box-shadow: 0 2px 8px rgba(255, 0, 122, 0.3);
+  position: relative;
+  margin-right: 15px;
+  animation: pulsePink 2.4s ease-in-out infinite;
+}
+
+.nav-link-post::after {
+  content: '';
+  position: absolute;
+  right: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 10px solid #FF007A;
+  transition: border-left-color 0.3s ease;
+}
+
+.nav-link-post:hover {
+  background: white;
+  color: #FF007A;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.nav-link-post:hover::after {
+  border-left-color: white;
+}
+
+.nav-link-texts {
+  color: white;
+  background: #00FFB3;
+  border: none;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.2rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  padding: 0.5rem 1.2rem;
+  border-radius: 25px;
+  box-shadow: 0 2px 8px rgba(0, 255, 179, 0.3);
+  position: relative;
+  margin-left: 15px;
+  animation: pulseGreen 3.375s ease-in-out infinite;
+}
+
+.nav-link-texts::before {
+  content: '';
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-right: 10px solid #00FFB3;
+  transition: border-right-color 0.3s ease;
 }
 
 .nav-link-texts:hover {
-  color: white;
+  background: white;
+  color: #00FFB3;
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.nav-link-texts:hover::before {
+  border-right-color: white;
 }
 
 /* Main content styling */
