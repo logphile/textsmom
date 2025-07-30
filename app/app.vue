@@ -29,7 +29,7 @@
         
         <nav class="mobile-menu" :class="{ 'active': showMobileMenu }">
           <button @click="scrollToTexts; closeMobileMenu()" class="mobile-nav-link mobile-nav-link-texts">THE TEXTS</button>
-          <NuxtLink to="/post" class="mobile-nav-link" @click="closeMobileMenu">POST!</NuxtLink>
+          <NuxtLink to="/post" class="mobile-nav-link mobile-nav-link-post" @click="closeMobileMenu">POST!</NuxtLink>
           <NuxtLink to="/about" class="mobile-nav-link" @click="closeMobileMenu">ABOUT</NuxtLink>
           <NuxtLink to="/contact" class="mobile-nav-link" @click="closeMobileMenu">CONTACT</NuxtLink>
         </nav>
@@ -1827,6 +1827,52 @@ a:hover {
   color: #00FFB3 !important;
   box-shadow: 0 3px 8px rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
+}
+
+.mobile-nav-link-post {
+  color: white !important;
+  background: #FF007A;
+  border: none;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.5rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  padding: 0.7rem 1rem;
+  margin: 0.5rem 0 0.5rem 0;
+  margin-right: 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 6px rgba(255, 0, 122, 0.3), 0 0 12px rgba(255, 0, 122, 0.2);
+  transition: all 0.3s ease;
+  border-bottom: none;
+  position: relative;
+  animation: pulsePink 2.4s ease-in-out infinite;
+}
+
+.mobile-nav-link-post::after {
+  content: '';
+  position: absolute;
+  right: -6px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid #FF007A;
+  transition: border-left-color 0.3s ease;
+}
+
+.mobile-nav-link-post:hover {
+  background: white !important;
+  color: #FF007A !important;
+  box-shadow: 0 3px 8px rgba(255, 255, 255, 0.2), 0 0 15px rgba(255, 0, 122, 0.3);
+  transform: translateY(-1px);
+}
+
+.mobile-nav-link-post:hover::after {
+  border-left-color: white;
 }
 
 .mobile-nav-link-texts:hover::before {
