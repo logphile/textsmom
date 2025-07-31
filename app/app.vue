@@ -1560,27 +1560,27 @@ const submitPost = async () => {
       moderationViolationType.value = flaggedCategories || 'inappropriate content'
       return
     }
-    // Create new post from POST form
+    
+    // Create post data with location
     const postData = {
       name: form.value.name,
       message: form.value.text,
       location: form.value.state ? `${form.value.state}, ${form.value.country}` : form.value.country
     }
     
-    console.log('Attempting to add post:', postData)
-    const { post, error } = await addPost(postData)
+    console.log('Attempting to submit post with SEO fields:', postData)
     
-    if (error) {
-      console.error('Full Supabase error object:', error)
-      console.error('Error details:', JSON.stringify(error, null, 2))
+    // Use the new composable to submit post with auto-generated SEO fields
+    const { submitPost: submitPostWithSEO } = useSubmitPost()
+    const result = await submitPostWithSEO(postData)
+    
+    if (!result.success) {
+      console.error('Post submission failed:', result.error)
       
-      // Check various ways the table not found error might appear
-      const errorString = JSON.stringify(error).toLowerCase()
-      const errorMessage = error.message || error.details || error.hint || 'Unknown error'
-      
-      if (errorString.includes('relation') && errorString.includes('does not exist') ||
-          errorString.includes('table') && errorString.includes('not found') ||
-          errorString.includes('posts') && errorString.includes('does not exist')) {
+      // Check for table not found error
+      if (result.error?.includes('relation') && result.error?.includes('does not exist') ||
+          result.error?.includes('table') && result.error?.includes('not found') ||
+          result.error?.includes('posts') && result.error?.includes('does not exist')) {
         
         alert('❌ Database table not found!\n\nThe posts table doesn\'t exist in your Supabase database yet.\n\nPlease create it by running the SQL commands shown in the browser console.')
         
@@ -1597,6 +1597,11 @@ CREATE TABLE IF NOT EXISTS posts (
   name TEXT NOT NULL,
   message TEXT NOT NULL,
   location TEXT NOT NULL,
+  slug TEXT,
+  seoTitle TEXT,
+  seoDescription TEXT,
+  likes INTEGER DEFAULT 0,
+  dislikes INTEGER DEFAULT 0,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -1608,6 +1613,9 @@ CREATE POLICY "Allow public read access" ON posts
 CREATE POLICY "Allow public insert access" ON posts
   FOR INSERT WITH CHECK (true);
 
+CREATE POLICY "Allow public update access" ON posts
+  FOR UPDATE USING (true);
+
 INSERT INTO posts (name, message, location) VALUES 
   ('Sarah', 'honey can you pick up some milk on your way home also your father says the lawn mower is broken again and we need to call someone but I dont know who to call do you know anyone', 'California, United States'),
   ('Mike', 'Mom just texted: "The internet is down. How do I fix it? Also, what\'s my password for the email? And can you come over this weekend to help me with the TV remote? It\'s not working right."', 'Texas, United States'),
@@ -1617,12 +1625,12 @@ INSERT INTO posts (name, message, location) VALUES
 6. Try submitting a post again!
 `)
       } else {
-        alert(`❌ Database error occurred!\n\nError: ${errorMessage}\n\nCheck the browser console for full details.`)
+        alert(`❌ Database error occurred!\n\nError: ${result.error}\n\nCheck the browser console for full details.`)
       }
       return
     }
     
-    console.log('Post added successfully:', post)
+    console.log('Post submitted successfully with SEO fields:', result.data)
     
     // Show success modal instead of alert
     showSuccessModal.value = true
