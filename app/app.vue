@@ -535,29 +535,6 @@ const getPageTitle = () => {
   }
 }
 
-// Google Analytics
-useHead({
-  script: [
-    {
-      src: 'https://www.googletagmanager.com/gtag/js?id=G-F7NW6VS4H4',
-      async: true
-    }
-  ]
-})
-
-useHead({
-  script: [
-    {
-      children: `
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-F7NW6VS4H4');
-      `
-    }
-  ]
-})
-
 // Set dynamic page title and meta description
 useHead({
   title: computed(() => getPageTitle()),
@@ -682,14 +659,11 @@ useHead({
       async: true
     },
     {
-      children: `
+      innerHTML: `
         window.dataLayer = window.dataLayer || [];
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
-        gtag('config', 'G-F7NW6VS4H4', {
-          page_title: document.title,
-          page_location: window.location.href
-        });
+        gtag('config', 'G-F7NW6VS4H4');
       `
     }
   ]
