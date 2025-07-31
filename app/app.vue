@@ -191,6 +191,161 @@
         </div>
       </div>
     </main>
+    <main v-else-if="$route.path.startsWith('/post/')">
+      <hr class="site-hr">
+      <div v-if="currentPost" class="individual-post-container">
+        <!-- Navigation Buttons -->
+        <div class="post-navigation">
+          <button @click="goBackToFeed" class="back-btn">
+            ← Back to Feed
+          </button>
+          <button 
+            @click="goToNextPost" 
+            class="next-btn"
+            :disabled="!hasNextPost"
+            :title="hasNextPost ? 'Go to next post' : 'No more posts'"
+          >
+            Next Mom Text →
+          </button>
+        </div>
+        
+        <!-- Individual Post Display -->
+        <div class="individual-post-card">
+          <div class="post-header">
+            <span class="post-author">{{ currentPost.name }}</span>
+            <span class="post-location">{{ currentPost.location }}</span>
+          </div>
+          <div class="post-content">{{ currentPost.message }}</div>
+          <div class="post-footer">
+            <div class="post-timestamp">{{ formatDate(currentPost.created_at) }}</div>
+            <div class="post-actions">
+              <!-- Report and Share Buttons -->
+              <div class="post-sharing">
+                <button 
+                  @click="reportPost(currentPost)"
+                  class="share-btn report-btn"
+                  title="Report this post"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                  </svg>
+                </button>
+                
+                <div class="share-divider"></div>
+                
+                <button 
+                  @click="shareToTwitter(currentPost)"
+                  class="share-btn share-twitter"
+                  title="Share on Twitter"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                </button>
+                <button 
+                  @click="shareToInstagram(currentPost)"
+                  class="share-btn share-instagram"
+                  title="Share on Instagram"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                  </svg>
+                </button>
+                <button 
+                  @click="copyPostLink(currentPost)"
+                  class="share-btn share-copy"
+                  title="Copy link"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <!-- Voting Buttons -->
+              <div class="post-voting">
+                <button 
+                  @click="voteOnPost(currentPost.id, 'up')"
+                  :class="['vote-btn', 'vote-up', { 'voted': hasUserVoted(currentPost.id, 'up') }]"
+                  :disabled="isVoting"
+                >
+                  👍 <span class="vote-count">{{ currentPost.likes || 0 }}</span>
+                </button>
+                <button 
+                  @click="voteOnPost(currentPost.id, 'down')"
+                  :class="['vote-btn', 'vote-down', { 'voted': hasUserVoted(currentPost.id, 'down') }]"
+                  :disabled="isVoting"
+                >
+                  👎 <span class="vote-count">{{ currentPost.dislikes || 0 }}</span>
+                </button>
+                
+                <!-- Comment Button -->
+                <button 
+                  @click="toggleComments(currentPost.id)"
+                  class="comment-btn"
+                  :title="`${getCommentCount(currentPost.id)} comments`"
+                >
+                  💬 <span class="comment-count">{{ getCommentCount(currentPost.id) }}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Always Show Comments on Individual Post Page -->
+        <div class="comment-section comment-section-expanded">
+          <div class="comment-header">
+            <h4>Comments ({{ getCommentCount(currentPost.id) }})</h4>
+          </div>
+          
+          <!-- Existing Comments -->
+          <div class="comments-list">
+            <div v-if="getPostComments(currentPost.id).length === 0" class="no-comments">
+              No comments yet. Be the first to comment!
+            </div>
+            <div v-for="comment in getPostComments(currentPost.id)" :key="comment.id" class="comment-item">
+              <div class="comment-author">{{ comment.author }}</div>
+              <div class="comment-content">{{ comment.content }}</div>
+              <div class="comment-timestamp">{{ formatDate(comment.created_at) }}</div>
+            </div>
+          </div>
+          
+          <!-- Add New Comment Form -->
+          <div class="add-comment-form">
+            <div class="comment-input-group">
+              <input 
+                v-model="newComment.author" 
+                type="text" 
+                placeholder="Your name..."
+                class="comment-author-input"
+                maxlength="50"
+              >
+              <textarea 
+                v-model="newComment.content" 
+                placeholder="Write a comment..."
+                class="comment-content-input"
+                rows="3"
+                maxlength="500"
+              ></textarea>
+              <button 
+                @click="submitComment(currentPost.id)"
+                class="submit-comment-btn"
+                :disabled="!newComment.author.trim() || !newComment.content.trim() || isSubmittingComment"
+              >
+                {{ isSubmittingComment ? 'Posting...' : 'Post Comment' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Post Not Found -->
+      <div v-else class="post-not-found">
+        <h2>Post Not Found</h2>
+        <p>The post you're looking for doesn't exist or has been removed.</p>
+        <button @click="goBackToFeed" class="back-btn">← Back to Feed</button>
+      </div>
+    </main>
     <main v-else>
       <hr class="site-hr">
       <h1 class="sr-only">TextsMom - Share Your Unhinged Mom Texts</h1>
@@ -252,7 +407,7 @@
         </div>
         
         <div class="posts-container">
-          <div v-for="(post, index) in paginatedPosts" :key="post.id" :class="['post-card', 'chat-bubble', index % 2 === 0 ? 'chat-left' : 'chat-right']">
+          <div v-for="(post, index) in paginatedPosts" :key="post.id" :class="['post-card', 'chat-bubble', index % 2 === 0 ? 'chat-left' : 'chat-right']" @click="openPost(post.id, $event)">
             <div class="post-header">
               <span class="post-author">{{ post.name }}</span>
               <span class="post-location">{{ post.location }}</span>
@@ -319,6 +474,61 @@
                     :disabled="isVoting"
                   >
                     👎 <span class="vote-count">{{ post.dislikes || 0 }}</span>
+                  </button>
+                  
+                  <!-- Comment Button -->
+                  <button 
+                    @click="toggleComments(post.id)"
+                    class="comment-btn"
+                    :title="`${getCommentCount(post.id)} comments`"
+                  >
+                    💬 <span class="comment-count">{{ getCommentCount(post.id) }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Expandable Comment Section -->
+            <div v-if="isCommentsExpanded(post.id)" class="comment-section">
+              <div class="comment-header">
+                <h4>Comments ({{ getCommentCount(post.id) }})</h4>
+              </div>
+              
+              <!-- Existing Comments -->
+              <div class="comments-list">
+                <div v-if="getPostComments(post.id).length === 0" class="no-comments">
+                  No comments yet. Be the first to comment!
+                </div>
+                <div v-for="comment in getPostComments(post.id)" :key="comment.id" class="comment-item">
+                  <div class="comment-author">{{ comment.author }}</div>
+                  <div class="comment-content">{{ comment.content }}</div>
+                  <div class="comment-timestamp">{{ formatDate(comment.created_at) }}</div>
+                </div>
+              </div>
+              
+              <!-- Add New Comment Form -->
+              <div class="add-comment-form">
+                <div class="comment-input-group">
+                  <input 
+                    v-model="newComment.author" 
+                    type="text" 
+                    placeholder="Your name..."
+                    class="comment-author-input"
+                    maxlength="50"
+                  >
+                  <textarea 
+                    v-model="newComment.content" 
+                    placeholder="Write a comment..."
+                    class="comment-content-input"
+                    rows="3"
+                    maxlength="500"
+                  ></textarea>
+                  <button 
+                    @click="submitComment(post.id)"
+                    class="submit-comment-btn"
+                    :disabled="!newComment.author.trim() || !newComment.content.trim() || isSubmittingComment"
+                  >
+                    {{ isSubmittingComment ? 'Posting...' : 'Post Comment' }}
                   </button>
                 </div>
               </div>
@@ -1557,6 +1767,276 @@ const formatDate = (dateString) => {
     minute: '2-digit'
   }).format(date)
 }
+
+// Comment functionality
+const comments = ref({})
+const expandedComments = ref(new Set())
+const newComment = ref({
+  author: '',
+  content: ''
+})
+const isSubmittingComment = ref(false)
+
+// Toggle comment section visibility
+const toggleComments = (postId) => {
+  if (expandedComments.value.has(postId)) {
+    expandedComments.value.delete(postId)
+  } else {
+    expandedComments.value.add(postId)
+  }
+}
+
+// Check if comments are expanded for a post
+const isCommentsExpanded = (postId) => {
+  return expandedComments.value.has(postId)
+}
+
+// Get comments for a specific post
+const getPostComments = (postId) => {
+  return comments.value[postId] || []
+}
+
+// Get comment count for a post
+const getCommentCount = (postId) => {
+  return (comments.value[postId] || []).length
+}
+
+// Submit a new comment
+const submitComment = async (postId) => {
+  if (!newComment.value.author.trim() || !newComment.value.content.trim()) {
+    return
+  }
+  
+  isSubmittingComment.value = true
+  
+  try {
+    // Create new comment object
+    const comment = {
+      id: Date.now(), // Temporary ID - will be replaced with proper DB ID later
+      author: newComment.value.author.trim(),
+      content: newComment.value.content.trim(),
+      created_at: new Date().toISOString(),
+      post_id: postId
+    }
+    
+    // Add comment to local state
+    if (!comments.value[postId]) {
+      comments.value[postId] = []
+    }
+    comments.value[postId].push(comment)
+    
+    // TODO: Add API call to save comment to database
+    // await addCommentToDatabase(comment)
+    
+    // Clear form
+    newComment.value.author = ''
+    newComment.value.content = ''
+    
+    console.log('Comment added successfully:', comment)
+    
+  } catch (error) {
+    console.error('Error adding comment:', error)
+    // TODO: Show error message to user
+  } finally {
+    isSubmittingComment.value = false
+  }
+}
+
+// Initialize with some sample comments for testing
+const initializeSampleComments = () => {
+  comments.value = {
+    1: [
+      {
+        id: 1,
+        author: 'Sarah',
+        content: 'OMG this is so my mom! 😂',
+        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        post_id: 1
+      },
+      {
+        id: 2,
+        author: 'Mike',
+        content: 'Classic mom move right there',
+        created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+        post_id: 1
+      }
+    ],
+    2: [
+      {
+        id: 3,
+        author: 'Jenny',
+        content: 'The struggle is real! My mom does this too',
+        created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
+        post_id: 2
+      }
+    ]
+  }
+}
+
+// Initialize sample comments when component mounts
+onMounted(() => {
+  initializeSampleComments()
+})
+
+// Individual Post Navigation
+const currentPost = ref(null)
+
+// Open individual post page
+const openPost = (postId, event) => {
+  // Prevent opening post if user clicked on interactive elements
+  if (event.target.closest('.post-actions') || 
+      event.target.closest('.vote-btn') || 
+      event.target.closest('.comment-btn') || 
+      event.target.closest('.share-btn') ||
+      event.target.closest('.comment-section')) {
+    return
+  }
+  
+  // Navigate to individual post page
+  navigateTo(`/post/${postId}`)
+}
+
+// Go back to main feed
+const goBackToFeed = () => {
+  navigateTo('/')
+}
+
+// Get next post ID
+const getNextPostId = () => {
+  if (!currentPost.value || posts.value.length === 0) return null
+  
+  const currentIndex = posts.value.findIndex(post => post.id === currentPost.value.id)
+  if (currentIndex === -1 || currentIndex === posts.value.length - 1) {
+    return null // No next post or current post not found
+  }
+  
+  return posts.value[currentIndex + 1].id
+}
+
+// Check if there's a next post available
+const hasNextPost = computed(() => {
+  return getNextPostId() !== null
+})
+
+// Navigate to next post
+const goToNextPost = () => {
+  const nextPostId = getNextPostId()
+  if (nextPostId) {
+    navigateTo(`/post/${nextPostId}`)
+  }
+}
+
+// Find and set current post based on route
+const setCurrentPostFromRoute = () => {
+  const route = useRoute()
+  if (route.path.startsWith('/post/')) {
+    const postId = parseInt(route.path.split('/')[2])
+    if (postId) {
+      // Find post in current posts array
+      const foundPost = posts.value.find(post => post.id === postId)
+      if (foundPost) {
+        currentPost.value = foundPost
+      } else {
+        // If not found in current posts, try to load it from database
+        loadIndividualPost(postId)
+      }
+    }
+  } else {
+    currentPost.value = null
+  }
+}
+
+// Load individual post from database (for direct URL access)
+const loadIndividualPost = async (postId) => {
+  try {
+    // Try to find in existing posts first
+    const existingPost = posts.value.find(post => post.id === postId)
+    if (existingPost) {
+      currentPost.value = existingPost
+      return
+    }
+    
+    // TODO: Add API call to fetch individual post from database
+    // For now, we'll use sample data or show not found
+    const samplePosts = [
+      {
+        id: 1,
+        name: 'Sarah',
+        message: 'honey can you pick up some milk on your way home also your father wants to know if you can help him move the couch this weekend but not sunday because we have church and also remind me to tell you about what happened at the grocery store today with mrs henderson',
+        location: 'California, United States',
+        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+        likes: 0,
+        dislikes: 0
+      },
+      {
+        id: 2,
+        name: 'Mike',
+        message: 'Mom just texted: "The internet is down. How do I fix it? Also, what\'s my password for the email? And can you come over this weekend to help me with the TV remote? It\'s not working right."',
+        location: 'Texas, United States',
+        created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
+        likes: 0,
+        dislikes: 0
+      },
+      {
+        id: 3,
+        name: 'Jessica',
+        message: 'call me when you get this its important but not an emergency but kind of urgent but dont worry its nothing serious just call me ok love you',
+        location: 'Ontario, Canada',
+        created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
+        likes: 0,
+        dislikes: 0
+      }
+    ]
+    
+    const foundPost = samplePosts.find(post => post.id === postId)
+    if (foundPost) {
+      currentPost.value = foundPost
+      // Add to posts array if not already there
+      if (!posts.value.find(p => p.id === postId)) {
+        posts.value.unshift(foundPost)
+      }
+    } else {
+      currentPost.value = null
+    }
+    
+  } catch (error) {
+    console.error('Error loading individual post:', error)
+    currentPost.value = null
+  }
+}
+
+// Watch for route changes to update current post
+watch(() => useRoute().path, () => {
+  setCurrentPostFromRoute()
+}, { immediate: true })
+
+// Update page title for individual posts
+watch(currentPost, (newPost) => {
+  if (newPost) {
+    // Update page title and meta for individual post
+    useHead({
+      title: `${newPost.name}'s Mom Text - TextsMom`,
+      meta: [
+        {
+          name: 'description',
+          content: `Read this hilarious mom text from ${newPost.name}: "${newPost.message.substring(0, 150)}${newPost.message.length > 150 ? '...' : ''}"`
+        },
+        {
+          property: 'og:title',
+          content: `${newPost.name}'s Mom Text - TextsMom`
+        },
+        {
+          property: 'og:description',
+          content: `"${newPost.message.substring(0, 200)}${newPost.message.length > 200 ? '...' : ''}"`
+        },
+        {
+          property: 'og:url',
+          content: `https://texts.mom/post/${newPost.id}`
+        }
+      ]
+    })
+  }
+})
 </script>
 
 <style>
@@ -2330,7 +2810,7 @@ main {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 800px;
+  max-width: 874px;
   margin: 0 auto;
   padding: 0 2rem;
 }
@@ -2344,6 +2824,7 @@ main {
   position: relative;
   max-width: 85%;
   word-wrap: break-word;
+  cursor: pointer;
 }
 
 .post-card:hover {
@@ -3503,6 +3984,353 @@ img {
   
   .random-post-bubble .post-author {
     font-size: 1.2rem;
+  }
+}
+
+/* Comment Functionality Styling */
+.comment-btn {
+  background: none;
+  border: none;
+  color: #B0B0B0;
+  cursor: pointer;
+  font-size: 0.9rem;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: 'Nunito', sans-serif;
+}
+
+.comment-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: #00FFB3;
+}
+
+.comment-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.comment-section {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  border-top: 2px solid #00FFB3;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.comment-header {
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.5rem;
+}
+
+.comment-header h4 {
+  margin: 0;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.2rem;
+  color: #00FFB3;
+  letter-spacing: 1px;
+}
+
+.comments-list {
+  margin-bottom: 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.no-comments {
+  text-align: center;
+  color: #888;
+  font-style: italic;
+  padding: 1rem;
+  font-family: 'Nunito', sans-serif;
+}
+
+.comment-item {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 0.75rem;
+  margin-bottom: 0.5rem;
+  border-left: 3px solid #FF007A;
+}
+
+.comment-author {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.9rem;
+  color: #FF007A;
+  margin-bottom: 0.25rem;
+  letter-spacing: 0.5px;
+}
+
+.comment-content {
+  font-family: 'Nunito', sans-serif;
+  color: white;
+  line-height: 1.4;
+  margin-bottom: 0.25rem;
+}
+
+.comment-timestamp {
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.add-comment-form {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1rem;
+}
+
+.comment-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.comment-author-input {
+  background-color: #2A2A3E;
+  border: 2px solid #444;
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: white;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease;
+}
+
+.comment-author-input:focus {
+  outline: none;
+  border-color: #00FFB3;
+}
+
+.comment-content-input {
+  background-color: #2A2A3E;
+  border: 2px solid #444;
+  border-radius: 8px;
+  padding: 0.75rem;
+  color: white;
+  font-family: 'Nunito', sans-serif;
+  font-size: 0.9rem;
+  resize: vertical;
+  min-height: 80px;
+  transition: border-color 0.2s ease;
+}
+
+.comment-content-input:focus {
+  outline: none;
+  border-color: #00FFB3;
+}
+
+.submit-comment-btn {
+  background: linear-gradient(135deg, #00FFB3, #00CC90);
+  border: none;
+  border-radius: 8px;
+  padding: 0.75rem 1.5rem;
+  color: #1B1B2A;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  align-self: flex-start;
+}
+
+.submit-comment-btn:hover:not(:disabled) {
+  background: linear-gradient(135deg, #00CC90, #00AA77);
+  transform: translateY(-1px);
+}
+
+.submit-comment-btn:disabled {
+  background: #444;
+  color: #888;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Mobile responsive for comments */
+@media (max-width: 768px) {
+  .comment-section {
+    margin-top: 0.75rem;
+    padding: 0.75rem;
+  }
+  
+  .comment-item {
+    padding: 0.5rem;
+  }
+  
+  .comment-author-input,
+  .comment-content-input {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+  
+  .submit-comment-btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+  }
+}
+
+/* Individual Post Page Styling */
+.individual-post-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.post-navigation {
+  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+}
+
+.back-btn,
+.next-btn {
+  background: none;
+  border: 2px solid #00FFB3;
+  color: #00FFB3;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 1px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+}
+
+.back-btn:hover,
+.next-btn:hover:not(:disabled) {
+  background-color: #00FFB3;
+  color: #1B1B2A;
+}
+
+.back-btn:hover {
+  transform: translateX(-2px);
+}
+
+.next-btn:hover:not(:disabled) {
+  transform: translateX(2px);
+}
+
+.next-btn:disabled {
+  border-color: #555;
+  color: #555;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.individual-post-card {
+  background-color: #2A2A3E;
+  border: 2px solid #FF007A;
+  border-radius: 18px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  box-shadow: 0 8px 25px rgba(255, 0, 122, 0.15);
+}
+
+.individual-post-card .post-content {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin: 1.5rem 0;
+  color: white;
+  font-family: 'Nunito', sans-serif;
+}
+
+.individual-post-card .post-header {
+  margin-bottom: 1rem;
+}
+
+.individual-post-card .post-author {
+  font-size: 1.3rem;
+  color: #FF007A;
+}
+
+.individual-post-card .post-location {
+  font-size: 1rem;
+  color: #B0B0B0;
+}
+
+.comment-section-expanded {
+  margin-top: 0;
+  border-top: none;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.post-not-found {
+  text-align: center;
+  padding: 4rem 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.post-not-found h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2.5rem;
+  color: #FF007A;
+  margin-bottom: 1rem;
+  letter-spacing: 2px;
+}
+
+.post-not-found p {
+  font-family: 'Nunito', sans-serif;
+  color: #B0B0B0;
+  font-size: 1.1rem;
+  margin-bottom: 2rem;
+  line-height: 1.5;
+}
+
+/* Mobile responsive for individual post page */
+@media (max-width: 768px) {
+  .individual-post-container {
+    padding: 1rem;
+  }
+  
+  .post-navigation {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  
+  .back-btn,
+  .next-btn {
+    padding: 0.6rem 1.2rem;
+    font-size: 0.9rem;
+    justify-content: center;
+  }
+  
+  .individual-post-card {
+    padding: 1.5rem;
+  }
+  
+  .individual-post-card .post-content {
+    font-size: 1rem;
+  }
+  
+  .post-not-found {
+    padding: 2rem 1rem;
+  }
+  
+  .post-not-found h2 {
+    font-size: 2rem;
   }
 }
 
