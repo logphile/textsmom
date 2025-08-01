@@ -895,7 +895,7 @@ useHead({
     {
       type: 'application/ld+json',
       innerHTML: computed(() => {
-        const baseSchema = {
+        const jsonLdGraph = {
           '@context': 'https://schema.org',
           '@graph': [
             {
@@ -915,11 +915,6 @@ useHead({
               '@id': 'https://texts.mom/#organization',
               'name': 'TextsMom',
               'url': 'https://texts.mom/',
-              'description': 'A community platform for sharing funny, unhinged, and confusing text messages from mothers.',
-              'sameAs': [
-                'https://twitter.com/textsmom',
-                'https://facebook.com/textsmom'
-              ],
               'logo': {
                 '@type': 'ImageObject',
                 'url': 'https://texts.mom/logo.png'
@@ -930,35 +925,8 @@ useHead({
               '@id': `https://texts.mom${route.path}#webpage`,
               'url': `https://texts.mom${route.path}`,
               'name': getPageTitle(),
-              'description': (() => {
-                // For individual post pages, use the post content as description
-                if (route.path.startsWith('/post/') && currentPost.value) {
-                  const description = currentPost.value.seoDescription || 
-                                    (currentPost.value.message ? 
-                                     currentPost.value.message.substring(0, 155).trim() + 
-                                     (currentPost.value.message.length > 155 ? '...' : '') : 
-                                     'A funny mom text shared on TextsMom')
-                  return description
-                }
-                
-                switch (route.path) {
-                  case '/':
-                    return 'Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world.'
-                  case '/post':
-                    return 'Submit your funny, confusing, or unhinged mom text messages to share with our community.'
-                  case '/contact':
-                    return 'Get in touch with the TextsMom team. We welcome feedback and suggestions.'
-                  case '/about':
-                    return 'Learn about TextsMom, the community dedicated to sharing the glorious dysfunction of modern motherhood.'
-                  default:
-                    return 'TextsMom - The home of unhinged mom texts from around the world.'
-                }
-              })(),
               'isPartOf': {
                 '@id': 'https://texts.mom/#website'
-              },
-              'about': {
-                '@id': 'https://texts.mom/#organization'
               }
             }
           ]
@@ -967,7 +935,8 @@ useHead({
         // Add BlogPosting schema for individual post pages
         if (route.path.startsWith('/post/') && currentPost.value) {
           const post = currentPost.value
-          const postUrl = `https://texts.mom/post/${post.slug || post.id}`
+          const postSlug = post.slug || post.id
+          const postUrl = `https://texts.mom/post/${postSlug}`
           
           // Generate title from post content if seoTitle not available
           const postTitle = post.seoTitle || 
@@ -988,7 +957,6 @@ useHead({
             '@id': `${postUrl}#blogposting`,
             'headline': postTitle,
             'description': postDescription,
-            'url': postUrl,
             'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
             'author': {
               '@type': 'Person',
@@ -1012,10 +980,10 @@ useHead({
             }
           }
           
-          baseSchema['@graph'].push(blogPostSchema)
+          jsonLdGraph['@graph'].push(blogPostSchema)
         }
         
-        return JSON.stringify(baseSchema)
+        return JSON.stringify(jsonLdGraph, null, 2)
       })
     },
     {
