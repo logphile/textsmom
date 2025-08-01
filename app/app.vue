@@ -735,7 +735,13 @@ const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // SEO field generation functions (integrated directly)
 const generateSlug = (text, maxLength = 60) => {
-  return text
+  console.log('generateSlug input:', text)
+  if (!text || typeof text !== 'string') {
+    console.error('Invalid text for slug generation:', text)
+    return 'untitled-post'
+  }
+  
+  const result = text
     .toLowerCase()
     .trim()
     .replace(/\s+/g, ' ')
@@ -745,6 +751,9 @@ const generateSlug = (text, maxLength = 60) => {
     .replace(/^-+|-+$/g, '')
     .substring(0, maxLength)
     .replace(/-+$/, '')
+  
+  console.log('generateSlug output:', result)
+  return result || 'untitled-post'
 }
 
 const generateSeoTitle = (message, maxLength = 60) => {
@@ -776,10 +785,31 @@ const generateSeoDescription = (message, maxLength = 155) => {
 }
 
 const generateSeoFields = (message) => {
+  console.log('generateSeoFields called with message:', message)
+  console.log('Message type:', typeof message)
+  console.log('Message length:', message ? message.length : 'undefined')
+  
+  if (!message || typeof message !== 'string') {
+    console.error('Invalid message passed to generateSeoFields:', message)
+    return {
+      slug: 'untitled-post',
+      seoTitle: 'Untitled Post',
+      seoDescription: 'A post from texts.mom'
+    }
+  }
+  
+  const slug = generateSlug(message)
+  const seoTitle = generateSeoTitle(message)
+  const seoDescription = generateSeoDescription(message)
+  
+  console.log('Generated slug:', slug)
+  console.log('Generated seoTitle:', seoTitle)
+  console.log('Generated seoDescription:', seoDescription)
+  
   return {
-    slug: generateSlug(message),
-    seoTitle: generateSeoTitle(message),
-    seoDescription: generateSeoDescription(message)
+    slug,
+    seoTitle,
+    seoDescription
   }
 }
 
@@ -942,6 +972,9 @@ const addPost = async (postData) => {
       name: postData.name,
       message: postData.message,
       location: postData.location,
+      slug: postData.slug,
+      seoTitle: postData.seoTitle,
+      seoDescription: postData.seoDescription,
       created_at: new Date().toISOString()
     }])
     .select()
@@ -1699,9 +1732,6 @@ INSERT INTO posts (name, message, location) VALUES
     
     console.log('Post submitted successfully with SEO fields:', post)
     
-    // Show success modal instead of alert
-    showSuccessModal.value = true
-    
     // Update rate limiting timestamp
     lastSubmissionTime.value = Date.now()
     
@@ -1715,6 +1745,16 @@ INSERT INTO posts (name, message, location) VALUES
     
     // Refresh posts data for homepage
     await loadPosts(1)
+    
+    // Redirect to the new post using slug (with fallback to ID)
+    const redirectSlug = post.slug || post.id
+    if (redirectSlug) {
+      console.log('Redirecting to post:', `/post/${redirectSlug}`)
+      await navigateTo(`/post/${redirectSlug}`)
+    } else {
+      console.warn('No slug or ID found in post data, redirecting to homepage')
+      await navigateTo('/')
+    }
     
   } catch (error) {
     console.error('Unexpected error submitting post:', error)
