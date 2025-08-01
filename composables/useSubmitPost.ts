@@ -19,12 +19,7 @@ export interface PostSubmissionResult {
   data?: any
 }
 
-export const useSubmitPost = () => {
-  // Use the same Supabase configuration as in app.vue
-  const supabaseUrl = 'https://dkugwkjmxkdwgihlrcsh.supabase.co'
-  const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrdWd3a2pteGtkd2dpaGxyY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4ODA2MTEsImV4cCI6MjA2ODQ1NjYxMX0.4RuyeQBnX5JxnPbF37mqf6GkIsX2R04Cne-eUgjEcpY'
-  const supabase = createClient(supabaseUrl, supabaseAnonKey)
-  
+export const useSubmitPost = (supabase: any) => {
   const isSubmitting = ref(false)
 
   /**

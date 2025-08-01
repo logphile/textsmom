@@ -728,8 +728,13 @@
 <script setup>
 import { createClient } from '@supabase/supabase-js'
 
+// Supabase configuration
+const supabaseUrl = 'https://dkugwkjmxkdwgihlrcsh.supabase.co'
+const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrdWd3a2pteGtkd2dpaGxyY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4ODA2MTEsImV4cCI6MjA2ODQ1NjYxMX0.4RuyeQBnX5JxnPbF37mqf6GkIsX2R04Cne-eUgjEcpY'
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
 // Import the post submission composable
-const { submitPost: submitPostWithSEO, isSubmitting: isSubmittingPost } = useSubmitPost()
+const { submitPost: submitPostWithSEO, isSubmitting: isSubmittingPost } = useSubmitPost(supabase)
 
 // Dynamic page titles for SEO
 const route = useRoute()
@@ -881,11 +886,6 @@ useHead({
     }
   ]
 })
-
-// Supabase configuration
-const supabaseUrl = 'https://dkugwkjmxkdwgihlrcsh.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrdWd3a2pteGtkd2dpaGxyY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4ODA2MTEsImV4cCI6MjA2ODQ1NjYxMX0.4RuyeQBnX5JxnPbF37mqf6GkIsX2R04Cne-eUgjEcpY'
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
 // Supabase functions
 const addPost = async (postData) => {
