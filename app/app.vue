@@ -3003,6 +3003,15 @@ main {
   color: white;
   margin-bottom: 1rem;
   word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  white-space: pre-wrap;
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 .post-footer {
