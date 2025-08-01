@@ -15,21 +15,18 @@ export default defineNuxtConfig({
       },
 
       link: [
-        // Preload Bebas Neue
         {
-          rel: 'preload',
-          as: 'font',
-          href: '/fonts/BebasNeue-Regular.woff2',
-          type: 'font/woff2',
-          crossorigin: 'anonymous'
+          rel: 'preconnect',
+          href: 'https://fonts.googleapis.com'
         },
-        // Preload Nunito
         {
-          rel: 'preload',
-          as: 'font',
-          href: '/fonts/Nunito-Regular.woff2',
-          type: 'font/woff2',
-          crossorigin: 'anonymous'
+          rel: 'preconnect',
+          href: 'https://fonts.gstatic.com',
+          crossorigin: ''
+        },
+        {
+          rel: 'stylesheet',
+          href: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap'
         },
         {
           rel: 'apple-touch-icon',

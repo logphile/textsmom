@@ -2301,29 +2301,15 @@ watch(currentPost, (newPost) => {
   }
 }
 
-/* Self-hosted font declarations */
-@font-face {
-  font-family: 'Bebas Neue';
-  src: url('/fonts/BebasNeue-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Nunito';
-  src: url('/fonts/Nunito-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+/* Restore Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
 
 /* Base typography setup */
 body {
   background-color: #1B1B2A;
   margin: 0;
   padding: 0;
-  font-family: 'Nunito', Arial, Helvetica, sans-serif;
+  font-family: 'Nunito', sans-serif;
   color: white;
 }
 
@@ -2333,7 +2319,7 @@ html {
 
 /* Primary typography - BebasNeue for titles and headlines */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   color: white;
   margin: 0;
   line-height: 1.2;
@@ -2358,7 +2344,7 @@ h3 {
 
 /* Secondary typography - Nunito for everything else */
 p, span, div, a, button, input, textarea, label {
-  font-family: 'Nunito', Arial, Helvetica, sans-serif;
+  font-family: 'Nunito', sans-serif;
 }
 
 p {
@@ -2525,7 +2511,7 @@ a:hover {
   color: white !important;
   background: #00FFB3;
   border: none;
-  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 1.5rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2566,7 +2552,7 @@ a:hover {
   color: white !important;
   background: #FF007A;
   border: none;
-  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 1.5rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2649,7 +2635,7 @@ a:hover {
   color: white;
   background: #FF007A;
   border: none;
-  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 2.2rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2662,7 +2648,7 @@ a:hover {
   position: relative;
   margin-right: 15px;
   animation: pulsePink 2.4s ease-in-out infinite;
-  min-width: 8.5rem; /* Match larger button per Lucy's instructions */
+  min-width: 6.5rem; /* Restore original min-width */
 }
 
 .nav-link-post::after {
@@ -2694,7 +2680,7 @@ a:hover {
   color: white;
   background: #00FFB3;
   border: none;
-  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 2.2rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
