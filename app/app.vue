@@ -728,6 +728,9 @@
 <script setup>
 import { createClient } from '@supabase/supabase-js'
 
+// Import the post submission composable
+const { submitPost: submitPostWithSEO, isSubmitting: isSubmittingPost } = useSubmitPost()
+
 // Dynamic page titles for SEO
 const route = useRoute()
 const getPageTitle = () => {
@@ -1570,8 +1573,7 @@ const submitPost = async () => {
     
     console.log('Attempting to submit post with SEO fields:', postData)
     
-    // Use the new composable to submit post with auto-generated SEO fields
-    const { submitPost: submitPostWithSEO } = useSubmitPost()
+    // Use the imported composable to submit post with auto-generated SEO fields
     const result = await submitPostWithSEO(postData)
     
     if (!result.success) {
