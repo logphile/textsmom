@@ -21,19 +21,18 @@
                            ssrPost.message.substring(0, 155).trim() + 
                            (ssrPost.message.length > 155 ? '...' : '') : 
                            'A hilarious mom text submitted to texts.mom.'),
+            'articleBody': ssrPost.message || 'A hilarious mom text.',
             'url': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}`,
             'datePublished': ssrPost.created_at ? new Date(ssrPost.created_at).toISOString() : new Date().toISOString(),
+            'dateModified': ssrPost.updated_at ? new Date(ssrPost.updated_at).toISOString() : (ssrPost.created_at ? new Date(ssrPost.created_at).toISOString() : new Date().toISOString()),
             'author': {
               '@type': 'Person',
               'name': ssrPost.name || 'Anonymous'
             },
-            'image': {
-              '@type': 'ImageObject',
-              'url': ssrPost.image || 'https://texts.mom/default-post-image.jpg'
-            },
             'publisher': {
               '@type': 'Organization',
               'name': 'TextsMom',
+              '@id': 'https://texts.mom/#organization',
               'logo': {
                 '@type': 'ImageObject',
                 'url': 'https://texts.mom/logo.png'
@@ -41,7 +40,12 @@
             },
             'mainEntityOfPage': {
               '@type': 'WebPage',
-              '@id': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}`
+              '@id': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}#webpage`
+            },
+            'isPartOf': {
+              '@type': 'Blog',
+              '@id': 'https://texts.mom/#blog',
+              'name': 'TextsMom'
             }
           }, null, 2)
         }}
