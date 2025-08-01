@@ -733,8 +733,55 @@ const supabaseUrl = 'https://dkugwkjmxkdwgihlrcsh.supabase.co'
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrdWd3a2pteGtkd2dpaGxyY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4ODA2MTEsImV4cCI6MjA2ODQ1NjYxMX0.4RuyeQBnX5JxnPbF37mqf6GkIsX2R04Cne-eUgjEcpY'
 const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-// Import the post submission composable
-const { submitPost: submitPostWithSEO, isSubmitting: isSubmittingPost } = useSubmitPost(supabase)
+// SEO field generation functions (integrated directly)
+const generateSlug = (text, maxLength = 60) => {
+  return text
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, ' ')
+    .replace(/[^a-z0-9\s]/g, '')
+    .replace(/\s/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .substring(0, maxLength)
+    .replace(/-+$/, '')
+}
+
+const generateSeoTitle = (message, maxLength = 60) => {
+  const trimmed = message.trim()
+  if (trimmed.length <= maxLength) return trimmed
+  
+  const truncated = trimmed.substring(0, maxLength)
+  const lastSpaceIndex = truncated.lastIndexOf(' ')
+  
+  if (lastSpaceIndex === -1 || lastSpaceIndex < maxLength * 0.7) {
+    return truncated.trim() + '...'
+  }
+  
+  return truncated.substring(0, lastSpaceIndex).trim() + '...'
+}
+
+const generateSeoDescription = (message, maxLength = 155) => {
+  const trimmed = message.trim()
+  if (trimmed.length <= maxLength) return trimmed
+  
+  const truncated = trimmed.substring(0, maxLength)
+  const lastSpaceIndex = truncated.lastIndexOf(' ')
+  
+  if (lastSpaceIndex === -1 || lastSpaceIndex < maxLength * 0.7) {
+    return truncated.trim() + '...'
+  }
+  
+  return truncated.substring(0, lastSpaceIndex).trim() + '...'
+}
+
+const generateSeoFields = (message) => {
+  return {
+    slug: generateSlug(message),
+    seoTitle: generateSeoTitle(message),
+    seoDescription: generateSeoDescription(message)
+  }
+}
 
 // Dynamic page titles for SEO
 const route = useRoute()
@@ -1573,16 +1620,34 @@ const submitPost = async () => {
     
     console.log('Attempting to submit post with SEO fields:', postData)
     
-    // Use the imported composable to submit post with auto-generated SEO fields
-    const result = await submitPostWithSEO(postData)
+    // Generate SEO fields from the message
+    console.log('Generating SEO fields for message:', postData.message)
+    const seoFields = generateSeoFields(postData.message)
+    console.log('Generated SEO fields:', seoFields)
     
-    if (!result.success) {
-      console.error('Post submission failed:', result.error)
+    // Create complete post object with SEO fields
+    const completePostData = {
+      ...postData,
+      slug: seoFields.slug,
+      seoTitle: seoFields.seoTitle,
+      seoDescription: seoFields.seoDescription
+    }
+    
+    console.log('Complete post object to insert:', completePostData)
+    
+    // Use the enhanced addPost function
+    const { post, error } = await addPost(completePostData)
+    
+    if (error) {
+      console.error('Post submission failed:', error)
       
       // Check for table not found error
-      if (result.error?.includes('relation') && result.error?.includes('does not exist') ||
-          result.error?.includes('table') && result.error?.includes('not found') ||
-          result.error?.includes('posts') && result.error?.includes('does not exist')) {
+      const errorString = JSON.stringify(error).toLowerCase()
+      const errorMessage = error.message || error.details || error.hint || 'Unknown error'
+      
+      if (errorString.includes('relation') && errorString.includes('does not exist') ||
+          errorString.includes('table') && errorString.includes('not found') ||
+          errorString.includes('posts') && errorString.includes('does not exist')) {
         
         alert('❌ Database table not found!\n\nThe posts table doesn\'t exist in your Supabase database yet.\n\nPlease create it by running the SQL commands shown in the browser console.')
         
@@ -1627,12 +1692,12 @@ INSERT INTO posts (name, message, location) VALUES
 6. Try submitting a post again!
 `)
       } else {
-        alert(`❌ Database error occurred!\n\nError: ${result.error}\n\nCheck the browser console for full details.`)
+        alert(`❌ Database error occurred!\n\nError: ${errorMessage}\n\nCheck the browser console for full details.`)
       }
       return
     }
     
-    console.log('Post submitted successfully with SEO fields:', result.data)
+    console.log('Post submitted successfully with SEO fields:', post)
     
     // Show success modal instead of alert
     showSuccessModal.value = true
