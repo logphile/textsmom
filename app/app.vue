@@ -932,56 +932,7 @@ useHead({
           ]
         }
         
-        // Add BlogPosting schema for individual post pages
-        if (route.path.startsWith('/post/') && currentPost.value) {
-          const post = currentPost.value
-          const postSlug = post.slug || post.id
-          const postUrl = `https://texts.mom/post/${postSlug}`
-          
-          // Generate title from post content if seoTitle not available
-          const postTitle = post.seoTitle || 
-                           (post.message ? 
-                            post.message.substring(0, 60).trim() + 
-                            (post.message.length > 60 ? '...' : '') : 
-                            'Mom Text')
-          
-          // Generate description from post content if seoDescription not available
-          const postDescription = post.seoDescription || 
-                                 (post.message ? 
-                                  post.message.substring(0, 155).trim() + 
-                                  (post.message.length > 155 ? '...' : '') : 
-                                  'A hilarious mom text submitted to texts.mom.')
-          
-          const blogPostSchema = {
-            '@type': 'BlogPosting',
-            '@id': `${postUrl}#blogposting`,
-            'headline': postTitle,
-            'description': postDescription,
-            'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
-            'author': {
-              '@type': 'Person',
-              'name': post.name || 'Anonymous'
-            },
-            'image': {
-              '@type': 'ImageObject',
-              'url': post.image || 'https://texts.mom/default-post-image.jpg'
-            },
-            'publisher': {
-              '@type': 'Organization',
-              'name': 'TextsMom',
-              'logo': {
-                '@type': 'ImageObject',
-                'url': 'https://texts.mom/logo.png'
-              }
-            },
-            'mainEntityOfPage': {
-              '@type': 'WebPage',
-              '@id': postUrl
-            }
-          }
-          
-          jsonLdGraph['@graph'].push(blogPostSchema)
-        }
+
         
         return JSON.stringify(jsonLdGraph, null, 2)
       })
@@ -1000,6 +951,72 @@ useHead({
     }
   ]
 })
+
+// Standalone BlogPosting JSON-LD for individual post pages
+watch([() => useRoute().path, currentPost], () => {
+  const route = useRoute()
+  
+  if (route.path.startsWith('/post/') && currentPost.value) {
+    const post = currentPost.value
+    const postSlug = post.slug || post.id
+    const postUrl = `https://texts.mom/post/${postSlug}`
+    
+    // Generate title from post content if seoTitle not available
+    const postTitle = post.seoTitle || 
+                     (post.message ? 
+                      post.message.substring(0, 60).trim() + 
+                      (post.message.length > 60 ? '...' : '') : 
+                      'Mom Text')
+    
+    // Generate description from post content if seoDescription not available
+    const postDescription = post.seoDescription || 
+                           (post.message ? 
+                            post.message.substring(0, 155).trim() + 
+                            (post.message.length > 155 ? '...' : '') : 
+                            'A hilarious mom text submitted to texts.mom.')
+    
+    const blogPostingLd = {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      '@id': `${postUrl}#blogposting`,
+      'headline': postTitle,
+      'description': postDescription,
+      'url': postUrl,
+      'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
+      'author': {
+        '@type': 'Person',
+        'name': post.name || 'Anonymous'
+      },
+      'image': {
+        '@type': 'ImageObject',
+        'url': post.image || 'https://texts.mom/default-post-image.jpg'
+      },
+      'publisher': {
+        '@type': 'Organization',
+        'name': 'TextsMom',
+        'logo': {
+          '@type': 'ImageObject',
+          'url': 'https://texts.mom/logo.png'
+        }
+      },
+      'mainEntityOfPage': {
+        '@type': 'WebPage',
+        '@id': postUrl
+      }
+    }
+    
+    // Inject BlogPosting JSON-LD as a separate script
+    useHead({
+      script: [
+        {
+          type: 'application/ld+json',
+          innerHTML: JSON.stringify(blogPostingLd, null, 2),
+          key: 'blogposting-ld' // Unique key to prevent duplicates
+        }
+      ]
+    })
+  }
+}, { immediate: true })
 
 // Supabase functions
 const addPost = async (postData) => {
