@@ -948,14 +948,23 @@ useHead({
         gtag('js', new Date());
         gtag('config', 'G-F7NW6VS4H4');
       `
+    },
+    // Standalone BlogPosting JSON-LD for individual post pages
+    {
+      type: 'application/ld+json',
+      innerHTML: computed(() => {
+        if (blogPostingJsonLd.value) {
+          return JSON.stringify(blogPostingJsonLd.value, null, 2)
+        }
+        return null
+      }),
+      key: 'blogposting-ld'
     }
-  ]
+  ].filter(script => script.innerHTML !== null)
 })
 
-// Standalone BlogPosting JSON-LD for individual post pages
-watch([() => useRoute().path, currentPost], () => {
-  const route = useRoute()
-  
+// Computed BlogPosting JSON-LD for individual post pages
+const blogPostingJsonLd = computed(() => {
   if (route.path.startsWith('/post/') && currentPost.value) {
     const post = currentPost.value
     const postSlug = post.slug || post.id
@@ -975,7 +984,7 @@ watch([() => useRoute().path, currentPost], () => {
                             (post.message.length > 155 ? '...' : '') : 
                             'A hilarious mom text submitted to texts.mom.')
     
-    const blogPostingLd = {
+    return {
       '@context': 'https://schema.org',
       '@type': 'BlogPosting',
       '@id': `${postUrl}#blogposting`,
@@ -1004,19 +1013,9 @@ watch([() => useRoute().path, currentPost], () => {
         '@id': postUrl
       }
     }
-    
-    // Inject BlogPosting JSON-LD as a separate script
-    useHead({
-      script: [
-        {
-          type: 'application/ld+json',
-          innerHTML: JSON.stringify(blogPostingLd, null, 2),
-          key: 'blogposting-ld' // Unique key to prevent duplicates
-        }
-      ]
-    })
   }
-}, { immediate: true })
+  return null
+})
 
 // Supabase functions
 const addPost = async (postData) => {
