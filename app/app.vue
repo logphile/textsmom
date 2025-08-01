@@ -1,56 +1,6 @@
 <template>
   <div class="site-container">
-    <!-- Server-side rendered BlogPosting JSON-LD for individual post pages -->
-    <Head v-if="$route.path.startsWith('/post/') && ssrPost">
-      <script 
-        type="application/ld+json" 
-        :key="'blogposting-' + (ssrPost.slug || ssrPost.id)"
-      >
-        {{
-          JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'BlogPosting',
-            '@id': 'https://texts.mom/post/' + (ssrPost.slug || ssrPost.id) + '#blogposting',
-            'headline': ssrPost.seoTitle || 
-                       (ssrPost.message ? 
-                        ssrPost.message.substring(0, 60).trim() + 
-                        (ssrPost.message.length > 60 ? '...' : '') : 
-                        'Mom Text'),
-            'description': ssrPost.seoDescription || 
-                          (ssrPost.message ? 
-                           ssrPost.message.substring(0, 155).trim() + 
-                           (ssrPost.message.length > 155 ? '...' : '') : 
-                           'A hilarious mom text submitted to texts.mom.'),
-            'articleBody': ssrPost.message || 'A hilarious mom text.',
-            'url': 'https://texts.mom/post/' + (ssrPost.slug || ssrPost.id),
-            'datePublished': ssrPost.created_at ? new Date(ssrPost.created_at).toISOString() : new Date().toISOString(),
-            'dateModified': ssrPost.updated_at ? new Date(ssrPost.updated_at).toISOString() : (ssrPost.created_at ? new Date(ssrPost.created_at).toISOString() : new Date().toISOString()),
-            'author': {
-              '@type': 'Person',
-              'name': ssrPost.name || 'Anonymous'
-            },
-            'publisher': {
-              '@type': 'Organization',
-              'name': 'TextsMom',
-              '@id': 'https://texts.mom/#organization',
-              'logo': {
-                '@type': 'ImageObject',
-                'url': 'https://texts.mom/logo.png'
-              }
-            },
-            'mainEntityOfPage': {
-              '@type': 'WebPage',
-              '@id': 'https://texts.mom/post/' + (ssrPost.slug || ssrPost.id) + '#webpage'
-            },
-            'isPartOf': {
-              '@type': 'Blog',
-              '@id': 'https://texts.mom/#blog',
-              'name': 'TextsMom'
-            }
-          }, null, 2)
-        }}
-      </script>
-    </Head>
+
     
     <NuxtRouteAnnouncer />
     <header class="site-header">
@@ -2184,10 +2134,53 @@ watch(() => useRoute().path, () => {
   setCurrentPostFromRoute()
 }, { immediate: true })
 
-// Update page title for individual posts
+// Update page title for individual posts and inject BlogPosting JSON-LD
 watch(currentPost, (newPost) => {
   if (newPost) {
-    // Update page title and meta for individual post
+    // Build BlogPosting JSON-LD object
+    const blogPostingLd = {
+      '@context': 'https://schema.org',
+      '@type': 'BlogPosting',
+      '@id': `https://texts.mom/post/${newPost.slug || newPost.id}#blogposting`,
+      'headline': newPost.seoTitle || 
+                 (newPost.message ? 
+                  newPost.message.substring(0, 60).trim() + 
+                  (newPost.message.length > 60 ? '...' : '') : 
+                  'Mom Text'),
+      'description': newPost.seoDescription || 
+                    (newPost.message ? 
+                     newPost.message.substring(0, 155).trim() + 
+                     (newPost.message.length > 155 ? '...' : '') : 
+                     'A hilarious mom text submitted to texts.mom.'),
+      'articleBody': newPost.message || 'A hilarious mom text.',
+      'url': `https://texts.mom/post/${newPost.slug || newPost.id}`,
+      'datePublished': newPost.created_at ? new Date(newPost.created_at).toISOString() : new Date().toISOString(),
+      'dateModified': newPost.updated_at ? new Date(newPost.updated_at).toISOString() : (newPost.created_at ? new Date(newPost.created_at).toISOString() : new Date().toISOString()),
+      'author': {
+        '@type': 'Person',
+        'name': newPost.name || 'Anonymous'
+      },
+      'publisher': {
+        '@type': 'Organization',
+        'name': 'TextsMom',
+        '@id': 'https://texts.mom/#organization',
+        'logo': {
+          '@type': 'ImageObject',
+          'url': 'https://texts.mom/logo.png'
+        }
+      },
+      'mainEntityOfPage': {
+        '@type': 'WebPage',
+        '@id': `https://texts.mom/post/${newPost.slug || newPost.id}#webpage`
+      },
+      'isPartOf': {
+        '@type': 'Blog',
+        '@id': 'https://texts.mom/#blog',
+        'name': 'TextsMom'
+      }
+    }
+
+    // Update page title, meta, and inject BlogPosting JSON-LD
     useHead({
       title: `${newPost.name}'s Mom Text - TextsMom`,
       meta: [
@@ -2205,7 +2198,14 @@ watch(currentPost, (newPost) => {
         },
         {
           property: 'og:url',
-          content: `https://texts.mom/post/${newPost.id}`
+          content: `https://texts.mom/post/${newPost.slug || newPost.id}`
+        }
+      ],
+      script: [
+        {
+          hid: 'blogposting-ld',
+          type: 'application/ld+json',
+          children: JSON.stringify(blogPostingLd, null, 2)
         }
       ]
     })
