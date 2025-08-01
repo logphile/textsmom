@@ -2147,9 +2147,14 @@ if (ssrPost.value) {
     'url': `https://texts.mom/post/${ssrPost.value.slug || ssrPost.value.id}`,
     'datePublished': ssrPost.value.created_at ? new Date(ssrPost.value.created_at).toISOString() : new Date().toISOString(),
     'dateModified': ssrPost.value.updated_at ? new Date(ssrPost.value.updated_at).toISOString() : (ssrPost.value.created_at ? new Date(ssrPost.value.created_at).toISOString() : new Date().toISOString()),
+    'image': {
+      '@type': 'ImageObject',
+      'url': ssrPost.value.image || 'https://texts.mom/default-post-image.jpg'
+    },
     'author': {
       '@type': 'Person',
-      'name': ssrPost.value.name || 'Anonymous'
+      'name': ssrPost.value.name || 'Anonymous',
+      'url': ssrPost.value.authorUrl || 'https://texts.mom/about'
     },
     'publisher': {
       '@type': 'Organization',
@@ -2210,9 +2215,14 @@ watch(currentPost, (newPost) => {
       'url': `https://texts.mom/post/${newPost.slug || newPost.id}`,
       'datePublished': newPost.created_at ? new Date(newPost.created_at).toISOString() : new Date().toISOString(),
       'dateModified': newPost.updated_at ? new Date(newPost.updated_at).toISOString() : (newPost.created_at ? new Date(newPost.created_at).toISOString() : new Date().toISOString()),
+      'image': {
+        '@type': 'ImageObject',
+        'url': newPost.image || 'https://texts.mom/default-post-image.jpg'
+      },
       'author': {
         '@type': 'Person',
-        'name': newPost.name || 'Anonymous'
+        'name': newPost.name || 'Anonymous',
+        'url': newPost.authorUrl || 'https://texts.mom/about'
       },
       'publisher': {
         '@type': 'Organization',
