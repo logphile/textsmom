@@ -2301,13 +2301,29 @@ watch(currentPost, (newPost) => {
   }
 }
 
+/* Font loading optimization with fallbacks */
+@font-face {
+  font-family: 'Nunito-Fallback';
+  src: local('Arial'), local('Helvetica'), local('sans-serif');
+  font-display: swap;
+  size-adjust: 100%;
+}
+
+@font-face {
+  font-family: 'BebasNeue-Fallback';
+  src: local('Arial Black'), local('Impact'), local('sans-serif');
+  font-display: swap;
+  size-adjust: 95%;
+}
+
 /* Base typography setup */
 body {
   background-color: #1B1B2A;
   margin: 0;
   padding: 0;
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Nunito', 'Nunito-Fallback', Arial, Helvetica, sans-serif;
   color: white;
+  font-display: swap;
 }
 
 html {
@@ -2316,10 +2332,11 @@ html {
 
 /* Primary typography - BebasNeue for titles and headlines */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue', 'BebasNeue-Fallback', 'Arial Black', Impact, sans-serif;
   color: white;
   margin: 0;
   line-height: 1.2;
+  font-display: swap;
 }
 
 h1 {
@@ -2341,7 +2358,8 @@ h3 {
 
 /* Secondary typography - Nunito for everything else */
 p, span, div, a, button, input, textarea, label {
-  font-family: 'Nunito', sans-serif;
+  font-family: 'Nunito', 'Nunito-Fallback', Arial, Helvetica, sans-serif;
+  font-display: swap;
 }
 
 p {
@@ -2521,6 +2539,7 @@ a:hover {
   transition: all 0.3s ease;
   border-bottom: none;
   position: relative;
+  min-width: 7rem; /* Prevent layout shift during font load */
 }
 
 .mobile-nav-link-texts::before {
@@ -2563,6 +2582,7 @@ a:hover {
   border-bottom: none;
   position: relative;
   animation: pulsePink 2.4s ease-in-out infinite;
+  min-width: 5.5rem; /* Prevent layout shift during font load */
 }
 
 .mobile-nav-link-post::after {
@@ -2643,6 +2663,7 @@ a:hover {
   position: relative;
   margin-right: 15px;
   animation: pulsePink 2.4s ease-in-out infinite;
+  min-width: 6.5rem; /* Prevent layout shift during font load */
 }
 
 .nav-link-post::after {
@@ -2687,6 +2708,7 @@ a:hover {
   position: relative;
   margin-left: 15px;
   animation: pulseGreen 3.375s ease-in-out infinite;
+  min-width: 8.5rem; /* Prevent layout shift during font load */
 }
 
 .nav-link-texts::before {
