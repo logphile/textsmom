@@ -13,31 +13,23 @@ export default defineNuxtConfig({
       htmlAttrs: {
         lang: 'en'
       },
-      noscript: [
-        {
-          innerHTML: '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap">'
-        }
-      ],
+
       link: [
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.googleapis.com'
-        },
-        {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossorigin: ''
-        },
+        // Preload Bebas Neue
         {
           rel: 'preload',
-          as: 'style',
-          href: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap'
+          as: 'font',
+          href: '/fonts/BebasNeue-Regular.woff2',
+          type: 'font/woff2',
+          crossorigin: 'anonymous'
         },
+        // Preload Nunito
         {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap',
-          media: 'print',
-          onload: "this.media='all'"
+          rel: 'preload',
+          as: 'font',
+          href: '/fonts/Nunito-Regular.woff2',
+          type: 'font/woff2',
+          crossorigin: 'anonymous'
         },
         {
           rel: 'apple-touch-icon',

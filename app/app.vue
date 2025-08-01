@@ -2301,19 +2301,21 @@ watch(currentPost, (newPost) => {
   }
 }
 
-/* Font loading optimization with fallbacks */
+/* Self-hosted font declarations */
 @font-face {
-  font-family: 'Nunito-Fallback';
-  src: local('Arial'), local('Helvetica'), local('sans-serif');
+  font-family: 'Bebas Neue';
+  src: url('/fonts/BebasNeue-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
   font-display: swap;
-  size-adjust: 100%;
 }
 
 @font-face {
-  font-family: 'BebasNeue-Fallback';
-  src: local('Arial Black'), local('Impact'), local('sans-serif');
+  font-family: 'Nunito';
+  src: url('/fonts/Nunito-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
   font-display: swap;
-  size-adjust: 95%;
 }
 
 /* Base typography setup */
@@ -2321,9 +2323,8 @@ body {
   background-color: #1B1B2A;
   margin: 0;
   padding: 0;
-  font-family: 'Nunito', 'Nunito-Fallback', Arial, Helvetica, sans-serif;
+  font-family: 'Nunito', Arial, Helvetica, sans-serif;
   color: white;
-  font-display: swap;
 }
 
 html {
@@ -2332,11 +2333,10 @@ html {
 
 /* Primary typography - BebasNeue for titles and headlines */
 h1, h2, h3, h4, h5, h6 {
-  font-family: 'Bebas Neue', 'BebasNeue-Fallback', 'Arial Black', Impact, sans-serif;
+  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
   color: white;
   margin: 0;
   line-height: 1.2;
-  font-display: swap;
 }
 
 h1 {
@@ -2358,8 +2358,7 @@ h3 {
 
 /* Secondary typography - Nunito for everything else */
 p, span, div, a, button, input, textarea, label {
-  font-family: 'Nunito', 'Nunito-Fallback', Arial, Helvetica, sans-serif;
-  font-display: swap;
+  font-family: 'Nunito', Arial, Helvetica, sans-serif;
 }
 
 p {
@@ -2526,7 +2525,7 @@ a:hover {
   color: white !important;
   background: #00FFB3;
   border: none;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
   font-size: 1.5rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2567,7 +2566,7 @@ a:hover {
   color: white !important;
   background: #FF007A;
   border: none;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
   font-size: 1.5rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2650,7 +2649,7 @@ a:hover {
   color: white;
   background: #FF007A;
   border: none;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
   font-size: 2.2rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -2663,7 +2662,7 @@ a:hover {
   position: relative;
   margin-right: 15px;
   animation: pulsePink 2.4s ease-in-out infinite;
-  min-width: 6.5rem; /* Prevent layout shift during font load */
+  min-width: 8.5rem; /* Match larger button per Lucy's instructions */
 }
 
 .nav-link-post::after {
@@ -2695,7 +2694,7 @@ a:hover {
   color: white;
   background: #00FFB3;
   border: none;
-  font-family: 'Bebas Neue', sans-serif;
+  font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
   font-size: 2.2rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
