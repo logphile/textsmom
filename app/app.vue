@@ -1,5 +1,53 @@
 <template>
   <div class="site-container">
+    <!-- Server-side rendered BlogPosting JSON-LD for individual post pages -->
+    <Head v-if="$route.path.startsWith('/post/') && currentPost">
+      <script 
+        type="application/ld+json" 
+        :key="'blogposting-' + (currentPost.slug || currentPost.id)"
+      >
+        {{
+          JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            '@id': `https://texts.mom/post/${currentPost.slug || currentPost.id}#blogposting`,
+            'headline': currentPost.seoTitle || 
+                       (currentPost.message ? 
+                        currentPost.message.substring(0, 60).trim() + 
+                        (currentPost.message.length > 60 ? '...' : '') : 
+                        'Mom Text'),
+            'description': currentPost.seoDescription || 
+                          (currentPost.message ? 
+                           currentPost.message.substring(0, 155).trim() + 
+                           (currentPost.message.length > 155 ? '...' : '') : 
+                           'A hilarious mom text submitted to texts.mom.'),
+            'url': `https://texts.mom/post/${currentPost.slug || currentPost.id}`,
+            'datePublished': currentPost.created_at ? new Date(currentPost.created_at).toISOString() : new Date().toISOString(),
+            'author': {
+              '@type': 'Person',
+              'name': currentPost.name || 'Anonymous'
+            },
+            'image': {
+              '@type': 'ImageObject',
+              'url': currentPost.image || 'https://texts.mom/default-post-image.jpg'
+            },
+            'publisher': {
+              '@type': 'Organization',
+              'name': 'TextsMom',
+              'logo': {
+                '@type': 'ImageObject',
+                'url': 'https://texts.mom/logo.png'
+              }
+            },
+            'mainEntityOfPage': {
+              '@type': 'WebPage',
+              '@id': `https://texts.mom/post/${currentPost.slug || currentPost.id}`
+            }
+          }, null, 2)
+        }}
+      </script>
+    </Head>
+    
     <NuxtRouteAnnouncer />
     <header class="site-header">
       <NuxtLink to="/" class="site-name-link">
@@ -923,65 +971,6 @@ useHead({
         gtag('js', new Date());
         gtag('config', 'G-F7NW6VS4H4');
       `
-    },
-    // Standalone BlogPosting JSON-LD for individual post pages
-    {
-      type: 'application/ld+json',
-      innerHTML: computed(() => {
-        if (route.path.startsWith('/post/') && currentPost.value) {
-          const post = currentPost.value
-          const postSlug = post.slug || post.id
-          const postUrl = `https://texts.mom/post/${postSlug}`
-          
-          // Generate title from post content if seoTitle not available
-          const postTitle = post.seoTitle || 
-                           (post.message ? 
-                            post.message.substring(0, 60).trim() + 
-                            (post.message.length > 60 ? '...' : '') : 
-                            'Mom Text')
-          
-          // Generate description from post content if seoDescription not available
-          const postDescription = post.seoDescription || 
-                                 (post.message ? 
-                                  post.message.substring(0, 155).trim() + 
-                                  (post.message.length > 155 ? '...' : '') : 
-                                  'A hilarious mom text submitted to texts.mom.')
-          
-          const blogPostingSchema = {
-            '@context': 'https://schema.org',
-            '@type': 'BlogPosting',
-            '@id': `${postUrl}#blogposting`,
-            'headline': postTitle,
-            'description': postDescription,
-            'url': postUrl,
-            'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
-            'author': {
-              '@type': 'Person',
-              'name': post.name || 'Anonymous'
-            },
-            'image': {
-              '@type': 'ImageObject',
-              'url': post.image || 'https://texts.mom/default-post-image.jpg'
-            },
-            'publisher': {
-              '@type': 'Organization',
-              'name': 'TextsMom',
-              'logo': {
-                '@type': 'ImageObject',
-                'url': 'https://texts.mom/logo.png'
-              }
-            },
-            'mainEntityOfPage': {
-              '@type': 'WebPage',
-              '@id': postUrl
-            }
-          }
-          
-          return JSON.stringify(blogPostingSchema, null, 2)
-        }
-        return ''
-      }),
-      key: 'blogposting-ld'
     }
   ]
 })
