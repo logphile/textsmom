@@ -981,69 +981,34 @@ useHead({
                                  (post.message ? 
                                   post.message.substring(0, 155).trim() + 
                                   (post.message.length > 155 ? '...' : '') : 
-                                  'A funny mom text shared on TextsMom')
+                                  'A hilarious mom text submitted to texts.mom.')
           
           const blogPostSchema = {
             '@type': 'BlogPosting',
             '@id': `${postUrl}#blogposting`,
-            'url': postUrl,
             'headline': postTitle,
-            'name': postTitle,
             'description': postDescription,
-            'articleBody': post.message || '',
+            'url': postUrl,
+            'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
             'author': {
               '@type': 'Person',
               'name': post.name || 'Anonymous'
             },
-            'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
-            'dateModified': post.updated_at ? new Date(post.updated_at).toISOString() : (post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString()),
+            'image': {
+              '@type': 'ImageObject',
+              'url': post.image || 'https://texts.mom/default-post-image.jpg'
+            },
             'publisher': {
               '@type': 'Organization',
-              '@id': 'https://texts.mom/#organization'
+              'name': 'TextsMom',
+              'logo': {
+                '@type': 'ImageObject',
+                'url': 'https://texts.mom/logo.png'
+              }
             },
             'mainEntityOfPage': {
               '@type': 'WebPage',
-              '@id': `${postUrl}#webpage`
-            },
-            'isPartOf': {
-              '@type': 'Blog',
-              '@id': 'https://texts.mom/#blog',
-              'name': 'TextsMom',
-              'description': 'A collection of unhinged, confusing, and hilarious text messages from moms around the world.'
-            },
-            'inLanguage': 'en-US',
-            'potentialAction': {
-              '@type': 'ReadAction',
-              'target': postUrl
-            }
-          }
-          
-          // Add location data if available
-          if (post.location) {
-            blogPostSchema.locationCreated = {
-              '@type': 'Place',
-              'name': post.location
-            }
-          }
-          
-          // Add interaction statistics if available
-          if (post.likes || post.dislikes) {
-            blogPostSchema.interactionStatistic = []
-            
-            if (post.likes) {
-              blogPostSchema.interactionStatistic.push({
-                '@type': 'InteractionCounter',
-                'interactionType': 'https://schema.org/LikeAction',
-                'userInteractionCount': post.likes
-              })
-            }
-            
-            if (post.dislikes) {
-              blogPostSchema.interactionStatistic.push({
-                '@type': 'InteractionCounter',
-                'interactionType': 'https://schema.org/DislikeAction',
-                'userInteractionCount': post.dislikes
-              })
+              '@id': postUrl
             }
           }
           
