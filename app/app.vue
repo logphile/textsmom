@@ -894,7 +894,7 @@ useHead({
   script: [
     {
       type: 'application/ld+json',
-      children: computed(() => {
+      innerHTML: computed(() => {
         const baseSchema = {
           '@context': 'https://schema.org',
           '@graph': [
