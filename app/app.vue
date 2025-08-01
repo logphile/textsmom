@@ -1,35 +1,35 @@
 <template>
   <div class="site-container">
     <!-- Server-side rendered BlogPosting JSON-LD for individual post pages -->
-    <Head v-if="$route.path.startsWith('/post/') && currentPost">
+    <Head v-if="$route.path.startsWith('/post/') && ssrPost">
       <script 
         type="application/ld+json" 
-        :key="'blogposting-' + (currentPost.slug || currentPost.id)"
+        :key="'blogposting-' + (ssrPost.slug || ssrPost.id)"
       >
         {{
           JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'BlogPosting',
-            '@id': `https://texts.mom/post/${currentPost.slug || currentPost.id}#blogposting`,
-            'headline': currentPost.seoTitle || 
-                       (currentPost.message ? 
-                        currentPost.message.substring(0, 60).trim() + 
-                        (currentPost.message.length > 60 ? '...' : '') : 
+            '@id': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}#blogposting`,
+            'headline': ssrPost.seoTitle || 
+                       (ssrPost.message ? 
+                        ssrPost.message.substring(0, 60).trim() + 
+                        (ssrPost.message.length > 60 ? '...' : '') : 
                         'Mom Text'),
-            'description': currentPost.seoDescription || 
-                          (currentPost.message ? 
-                           currentPost.message.substring(0, 155).trim() + 
-                           (currentPost.message.length > 155 ? '...' : '') : 
+            'description': ssrPost.seoDescription || 
+                          (ssrPost.message ? 
+                           ssrPost.message.substring(0, 155).trim() + 
+                           (ssrPost.message.length > 155 ? '...' : '') : 
                            'A hilarious mom text submitted to texts.mom.'),
-            'url': `https://texts.mom/post/${currentPost.slug || currentPost.id}`,
-            'datePublished': currentPost.created_at ? new Date(currentPost.created_at).toISOString() : new Date().toISOString(),
+            'url': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}`,
+            'datePublished': ssrPost.created_at ? new Date(ssrPost.created_at).toISOString() : new Date().toISOString(),
             'author': {
               '@type': 'Person',
-              'name': currentPost.name || 'Anonymous'
+              'name': ssrPost.name || 'Anonymous'
             },
             'image': {
               '@type': 'ImageObject',
-              'url': currentPost.image || 'https://texts.mom/default-post-image.jpg'
+              'url': ssrPost.image || 'https://texts.mom/default-post-image.jpg'
             },
             'publisher': {
               '@type': 'Organization',
@@ -41,7 +41,7 @@
             },
             'mainEntityOfPage': {
               '@type': 'WebPage',
-              '@id': `https://texts.mom/post/${currentPost.slug || currentPost.id}`
+              '@id': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}`
             }
           }, null, 2)
         }}
@@ -2128,6 +2128,51 @@ const loadIndividualPost = async (identifier) => {
     console.error('Error loading individual post:', error)
     currentPost.value = null
   }
+}
+
+// Server-side post data loading for SSR
+const { data: ssrPost } = await useAsyncData(
+  'current-post',
+  async () => {
+    if (route.path.startsWith('/post/')) {
+      const identifier = route.path.split('/')[2]
+      if (identifier) {
+        try {
+          let query = supabase.from('posts').select('*')
+          
+          // First try to find by slug
+          if (isNaN(identifier)) {
+            query = query.eq('slug', identifier)
+          } else {
+            // If it's a number, try both slug and ID
+            const postId = parseInt(identifier)
+            query = query.or(`slug.eq.${identifier},id.eq.${postId}`)
+          }
+          
+          const { data, error } = await query.single()
+          
+          if (error || !data) {
+            return null
+          }
+          
+          return data
+        } catch (error) {
+          console.error('Error loading post for SSR:', error)
+          return null
+        }
+      }
+    }
+    return null
+  },
+  {
+    server: true,
+    default: () => null
+  }
+)
+
+// Set currentPost from SSR data or client-side loading
+if (ssrPost.value) {
+  currentPost.value = ssrPost.value
 }
 
 // Watch for route changes to update current post
