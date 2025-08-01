@@ -851,30 +851,7 @@ useHead({
         }
       })
     },
-    { property: 'og:title', content: computed(() => getPageTitle()) },
-    { property: 'og:description', content: computed(() => {
-        switch (route.path) {
-          case '/':
-            return 'Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world.'
-          case '/post':
-            return 'Submit your funny, confusing, or unhinged mom text messages to share with our community.'
-          case '/contact':
-            return 'Get in touch with the TextsMom team. We welcome feedback and suggestions.'
-          case '/about':
-            return 'Learn about TextsMom, the community dedicated to sharing the glorious dysfunction of modern motherhood.'
-          default:
-            return 'TextsMom - The home of unhinged mom texts from around the world.'
-        }
-      })
-    },
-    { property: 'og:type', content: 'website' },
-    { property: 'og:url', content: computed(() => `https://texts.mom${route.path}`) },
-    { property: 'og:site_name', content: 'TextsMom' },
-    { name: 'twitter:card', content: 'summary_large_image' },
-    { name: 'twitter:site', content: '@textsmom' },
-    { name: 'keywords', content: 'mom texts, funny mom messages, unhinged texts, family humor, text messages, mom jokes, parenting humor' },
-    { name: 'author', content: 'TextsMom' },
-    { name: 'robots', content: 'index, follow' },
+    { charset: 'utf-8' },
     { name: 'viewport', content: 'width=device-width, initial-scale=1' },
     { 'http-equiv': 'X-UA-Compatible', content: 'IE=edge' },
     { name: 'theme-color', content: '#FF007A' },
@@ -932,8 +909,6 @@ useHead({
           ]
         }
         
-
-        
         return JSON.stringify(jsonLdGraph, null, 2)
       })
     },
@@ -953,68 +928,62 @@ useHead({
     {
       type: 'application/ld+json',
       innerHTML: computed(() => {
-        if (blogPostingJsonLd.value) {
-          return JSON.stringify(blogPostingJsonLd.value, null, 2)
+        if (route.path.startsWith('/post/') && currentPost.value) {
+          const post = currentPost.value
+          const postSlug = post.slug || post.id
+          const postUrl = `https://texts.mom/post/${postSlug}`
+          
+          // Generate title from post content if seoTitle not available
+          const postTitle = post.seoTitle || 
+                           (post.message ? 
+                            post.message.substring(0, 60).trim() + 
+                            (post.message.length > 60 ? '...' : '') : 
+                            'Mom Text')
+          
+          // Generate description from post content if seoDescription not available
+          const postDescription = post.seoDescription || 
+                                 (post.message ? 
+                                  post.message.substring(0, 155).trim() + 
+                                  (post.message.length > 155 ? '...' : '') : 
+                                  'A hilarious mom text submitted to texts.mom.')
+          
+          const blogPostingSchema = {
+            '@context': 'https://schema.org',
+            '@type': 'BlogPosting',
+            '@id': `${postUrl}#blogposting`,
+            'headline': postTitle,
+            'description': postDescription,
+            'url': postUrl,
+            'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
+            'author': {
+              '@type': 'Person',
+              'name': post.name || 'Anonymous'
+            },
+            'image': {
+              '@type': 'ImageObject',
+              'url': post.image || 'https://texts.mom/default-post-image.jpg'
+            },
+            'publisher': {
+              '@type': 'Organization',
+              'name': 'TextsMom',
+              'logo': {
+                '@type': 'ImageObject',
+                'url': 'https://texts.mom/logo.png'
+              }
+            },
+            'mainEntityOfPage': {
+              '@type': 'WebPage',
+              '@id': postUrl
+            }
+          }
+          
+          return JSON.stringify(blogPostingSchema, null, 2)
         }
-        return null
+        return ''
       }),
       key: 'blogposting-ld'
     }
-  ].filter(script => script.innerHTML !== null)
-})
-
-// Computed BlogPosting JSON-LD for individual post pages
-const blogPostingJsonLd = computed(() => {
-  if (route.path.startsWith('/post/') && currentPost.value) {
-    const post = currentPost.value
-    const postSlug = post.slug || post.id
-    const postUrl = `https://texts.mom/post/${postSlug}`
-    
-    // Generate title from post content if seoTitle not available
-    const postTitle = post.seoTitle || 
-                     (post.message ? 
-                      post.message.substring(0, 60).trim() + 
-                      (post.message.length > 60 ? '...' : '') : 
-                      'Mom Text')
-    
-    // Generate description from post content if seoDescription not available
-    const postDescription = post.seoDescription || 
-                           (post.message ? 
-                            post.message.substring(0, 155).trim() + 
-                            (post.message.length > 155 ? '...' : '') : 
-                            'A hilarious mom text submitted to texts.mom.')
-    
-    return {
-      '@context': 'https://schema.org',
-      '@type': 'BlogPosting',
-      '@id': `${postUrl}#blogposting`,
-      'headline': postTitle,
-      'description': postDescription,
-      'url': postUrl,
-      'datePublished': post.created_at ? new Date(post.created_at).toISOString() : new Date().toISOString(),
-      'author': {
-        '@type': 'Person',
-        'name': post.name || 'Anonymous'
-      },
-      'image': {
-        '@type': 'ImageObject',
-        'url': post.image || 'https://texts.mom/default-post-image.jpg'
-      },
-      'publisher': {
-        '@type': 'Organization',
-        'name': 'TextsMom',
-        'logo': {
-          '@type': 'ImageObject',
-          'url': 'https://texts.mom/logo.png'
-        }
-      },
-      'mainEntityOfPage': {
-        '@type': 'WebPage',
-        '@id': postUrl
-      }
-    }
-  }
-  return null
+  ]
 })
 
 // Supabase functions
