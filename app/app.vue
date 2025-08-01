@@ -215,7 +215,7 @@
             <span class="post-author">{{ currentPost.name }}</span>
             <span class="post-location">{{ currentPost.location }}</span>
           </div>
-          <div class="post-content">{{ currentPost.message }}</div>
+          <pre class="post-content whitespace-pre-wrap text-left break-words">{{ currentPost.message }}</pre>
           <div class="post-footer">
             <div class="post-timestamp">{{ formatDate(currentPost.created_at) }}</div>
             <div class="post-actions">
@@ -407,12 +407,12 @@
         </div>
         
         <div class="posts-container">
-          <div v-for="(post, index) in paginatedPosts" :key="post.id" :class="['post-card', 'chat-bubble', index % 2 === 0 ? 'chat-left' : 'chat-right']" @click="openPost(post.id, $event)">
+          <div v-for="(post, index) in paginatedPosts" :key="post.id" :class="['post-card', 'chat-bubble', index % 2 === 0 ? 'chat-left' : 'chat-right']" @click="openPost(post, $event)">
             <div class="post-header">
               <span class="post-author">{{ post.name }}</span>
               <span class="post-location">{{ post.location }}</span>
             </div>
-            <div class="post-content">{{ post.message }}</div>
+            <pre class="post-content whitespace-pre-wrap text-left break-words">{{ post.message }}</pre>
             <div class="post-footer">
               <div class="post-timestamp">{{ formatDate(post.created_at) }}</div>
               <div class="post-actions">
@@ -1890,7 +1890,7 @@ onMounted(() => {
 const currentPost = ref(null)
 
 // Open individual post page
-const openPost = (postId, event) => {
+const openPost = (post, event) => {
   // Prevent opening post if user clicked on interactive elements
   if (event.target.closest('.post-actions') || 
       event.target.closest('.vote-btn') || 
@@ -1900,8 +1900,9 @@ const openPost = (postId, event) => {
     return
   }
   
-  // Navigate to individual post page
-  navigateTo(`/post/${postId}`)
+  // Navigate to individual post page using slug (fallback to ID if no slug)
+  const identifier = post.slug || post.id
+  navigateTo(`/post/${identifier}`)
 }
 
 // Go back to main feed
@@ -1937,16 +1938,24 @@ const goToNextPost = () => {
 // Find and set current post based on route
 const setCurrentPostFromRoute = () => {
   const route = useRoute()
+  
   if (route.path.startsWith('/post/')) {
-    const postId = parseInt(route.path.split('/')[2])
-    if (postId) {
-      // Find post in current posts array
-      const foundPost = posts.value.find(post => post.id === postId)
+    const identifier = route.path.split('/')[2]
+    if (identifier) {
+      // First try to find by slug, then by ID as fallback
+      let foundPost = posts.value.find(post => post.slug === identifier)
+      
+      // If not found by slug, try by ID (for backward compatibility)
+      if (!foundPost && !isNaN(identifier)) {
+        const postId = parseInt(identifier)
+        foundPost = posts.value.find(post => post.id === postId)
+      }
+      
       if (foundPost) {
         currentPost.value = foundPost
       } else {
         // If not found in current posts, try to load it from database
-        loadIndividualPost(postId)
+        loadIndividualPost(identifier)
       }
     }
   } else {
@@ -1955,57 +1964,47 @@ const setCurrentPostFromRoute = () => {
 }
 
 // Load individual post from database (for direct URL access)
-const loadIndividualPost = async (postId) => {
+const loadIndividualPost = async (identifier) => {
   try {
-    // Try to find in existing posts first
-    const existingPost = posts.value.find(post => post.id === postId)
+    // Try to find in existing posts first (by slug or ID)
+    let existingPost = posts.value.find(post => post.slug === identifier)
+    if (!existingPost && !isNaN(identifier)) {
+      const postId = parseInt(identifier)
+      existingPost = posts.value.find(post => post.id === postId)
+    }
+    
     if (existingPost) {
       currentPost.value = existingPost
       return
     }
     
-    // TODO: Add API call to fetch individual post from database
-    // For now, we'll use sample data or show not found
-    const samplePosts = [
-      {
-        id: 1,
-        name: 'Sarah',
-        message: 'honey can you pick up some milk on your way home also your father wants to know if you can help him move the couch this weekend but not sunday because we have church and also remind me to tell you about what happened at the grocery store today with mrs henderson',
-        location: 'California, United States',
-        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        likes: 0,
-        dislikes: 0
-      },
-      {
-        id: 2,
-        name: 'Mike',
-        message: 'Mom just texted: "The internet is down. How do I fix it? Also, what\'s my password for the email? And can you come over this weekend to help me with the TV remote? It\'s not working right."',
-        location: 'Texas, United States',
-        created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-        likes: 0,
-        dislikes: 0
-      },
-      {
-        id: 3,
-        name: 'Jessica',
-        message: 'call me when you get this its important but not an emergency but kind of urgent but dont worry its nothing serious just call me ok love you',
-        location: 'Ontario, Canada',
-        created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-        likes: 0,
-        dislikes: 0
-      }
-    ]
+    // Query Supabase for the post
+    let query = supabase.from('posts').select('*')
     
-    const foundPost = samplePosts.find(post => post.id === postId)
-    if (foundPost) {
-      currentPost.value = foundPost
-      // Add to posts array if not already there
-      if (!posts.value.find(p => p.id === postId)) {
-        posts.value.unshift(foundPost)
-      }
+    // First try to find by slug
+    if (isNaN(identifier)) {
+      query = query.eq('slug', identifier)
     } else {
-      currentPost.value = null
+      // If it's a number, try both slug and ID
+      const postId = parseInt(identifier)
+      query = query.or(`slug.eq.${identifier},id.eq.${postId}`)
     }
+    
+    const { data, error } = await query.single()
+    
+    if (error) {
+      console.error('Error loading individual post:', error)
+      currentPost.value = null
+      return
+    }
+    
+    if (data) {
+      currentPost.value = data
+      return
+    }
+    
+    // If no post found, set to null
+    currentPost.value = null
     
   } catch (error) {
     console.error('Error loading individual post:', error)

@@ -46,7 +46,9 @@ export const useSubmitPost = () => {
       }
 
       // Generate SEO fields from the message
+      console.log('Generating SEO fields for message:', postData.message)
       const seoFields = generateSeoFields(postData.message)
+      console.log('Generated SEO fields:', seoFields)
 
       // Prepare the complete post object
       const postToInsert = {
@@ -58,6 +60,8 @@ export const useSubmitPost = () => {
         seoDescription: seoFields.seoDescription,
         created_at: new Date().toISOString()
       }
+      
+      console.log('Complete post object to insert:', postToInsert)
 
       // Insert into Supabase
       const { data, error } = await supabase
