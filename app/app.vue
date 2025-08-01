@@ -10,7 +10,7 @@
           JSON.stringify({
             '@context': 'https://schema.org',
             '@type': 'BlogPosting',
-            '@id': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}#blogposting`,
+            '@id': 'https://texts.mom/post/' + (ssrPost.slug || ssrPost.id) + '#blogposting',
             'headline': ssrPost.seoTitle || 
                        (ssrPost.message ? 
                         ssrPost.message.substring(0, 60).trim() + 
@@ -22,7 +22,7 @@
                            (ssrPost.message.length > 155 ? '...' : '') : 
                            'A hilarious mom text submitted to texts.mom.'),
             'articleBody': ssrPost.message || 'A hilarious mom text.',
-            'url': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}`,
+            'url': 'https://texts.mom/post/' + (ssrPost.slug || ssrPost.id),
             'datePublished': ssrPost.created_at ? new Date(ssrPost.created_at).toISOString() : new Date().toISOString(),
             'dateModified': ssrPost.updated_at ? new Date(ssrPost.updated_at).toISOString() : (ssrPost.created_at ? new Date(ssrPost.created_at).toISOString() : new Date().toISOString()),
             'author': {
@@ -40,7 +40,7 @@
             },
             'mainEntityOfPage': {
               '@type': 'WebPage',
-              '@id': `https://texts.mom/post/${ssrPost.slug || ssrPost.id}#webpage`
+              '@id': 'https://texts.mom/post/' + (ssrPost.slug || ssrPost.id) + '#webpage'
             },
             'isPartOf': {
               '@type': 'Blog',
