@@ -2127,6 +2127,60 @@ const { data: ssrPost } = await useAsyncData(
 // Set currentPost from SSR data or client-side loading
 if (ssrPost.value) {
   currentPost.value = ssrPost.value
+  
+  // Inject BlogPosting JSON-LD for SSR post data immediately
+  const ssrBlogPostingLd = {
+    '@context': 'https://schema.org',
+    '@type': 'BlogPosting',
+    '@id': `https://texts.mom/post/${ssrPost.value.slug || ssrPost.value.id}#blogposting`,
+    'headline': ssrPost.value.seoTitle || 
+               (ssrPost.value.message ? 
+                ssrPost.value.message.substring(0, 60).trim() + 
+                (ssrPost.value.message.length > 60 ? '...' : '') : 
+                'Mom Text'),
+    'description': ssrPost.value.seoDescription || 
+                  (ssrPost.value.message ? 
+                   ssrPost.value.message.substring(0, 155).trim() + 
+                   (ssrPost.value.message.length > 155 ? '...' : '') : 
+                   'A hilarious mom text submitted to texts.mom.'),
+    'articleBody': ssrPost.value.message || 'A hilarious mom text.',
+    'url': `https://texts.mom/post/${ssrPost.value.slug || ssrPost.value.id}`,
+    'datePublished': ssrPost.value.created_at ? new Date(ssrPost.value.created_at).toISOString() : new Date().toISOString(),
+    'dateModified': ssrPost.value.updated_at ? new Date(ssrPost.value.updated_at).toISOString() : (ssrPost.value.created_at ? new Date(ssrPost.value.created_at).toISOString() : new Date().toISOString()),
+    'author': {
+      '@type': 'Person',
+      'name': ssrPost.value.name || 'Anonymous'
+    },
+    'publisher': {
+      '@type': 'Organization',
+      'name': 'TextsMom',
+      '@id': 'https://texts.mom/#organization',
+      'logo': {
+        '@type': 'ImageObject',
+        'url': 'https://texts.mom/logo.png'
+      }
+    },
+    'mainEntityOfPage': {
+      '@type': 'WebPage',
+      '@id': `https://texts.mom/post/${ssrPost.value.slug || ssrPost.value.id}#webpage`
+    },
+    'isPartOf': {
+      '@type': 'Blog',
+      '@id': 'https://texts.mom/#blog',
+      'name': 'TextsMom'
+    }
+  }
+  
+  // Inject BlogPosting JSON-LD immediately for SSR
+  useHead({
+    script: [
+      {
+        key: 'ssr-blogposting-ld',
+        type: 'application/ld+json',
+        innerHTML: JSON.stringify(ssrBlogPostingLd, null, 2)
+      }
+    ]
+  })
 }
 
 // Watch for route changes to update current post
@@ -2203,9 +2257,9 @@ watch(currentPost, (newPost) => {
       ],
       script: [
         {
-          hid: 'blogposting-ld',
+          key: 'blogposting-ld',
           type: 'application/ld+json',
-          children: JSON.stringify(blogPostingLd, null, 2)
+          innerHTML: JSON.stringify(blogPostingLd, null, 2)
         }
       ]
     })
