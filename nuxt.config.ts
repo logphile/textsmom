@@ -16,6 +16,20 @@ export default defineNuxtConfig({
 
       link: [
         {
+          rel: 'preload',
+          as: 'font',
+          href: '/fonts/BebasNeue-Regular.woff2',
+          type: 'font/woff2',
+          crossorigin: 'anonymous'
+        },
+        {
+          rel: 'preload',
+          as: 'font',
+          href: '/fonts/Nunito-Regular.woff2',
+          type: 'font/woff2',
+          crossorigin: 'anonymous'
+        },
+        {
           rel: 'preconnect',
           href: 'https://fonts.googleapis.com'
         },
