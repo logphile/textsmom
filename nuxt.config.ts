@@ -2,6 +2,9 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  css: [
+    '~/assets/css/fonts.css'
+  ],
   runtimeConfig: {
     public: {
       supabaseUrl: process.env.SUPABASE_URL || '',
@@ -16,17 +19,18 @@ export default defineNuxtConfig({
 
       link: [
         {
-          rel: 'preconnect',
-          href: 'https://fonts.googleapis.com'
+          rel: 'preload',
+          as: 'font',
+          href: '/fonts/BebasNeue-Regular.woff2',
+          type: 'font/woff2',
+          crossorigin: 'anonymous'
         },
         {
-          rel: 'preconnect',
-          href: 'https://fonts.gstatic.com',
-          crossorigin: ''
-        },
-        {
-          rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap'
+          rel: 'preload',
+          as: 'font',
+          href: '/fonts/Nunito-Regular.woff2',
+          type: 'font/woff2',
+          crossorigin: 'anonymous'
         },
         {
           rel: 'apple-touch-icon',
