@@ -6,6 +6,9 @@ declare module "nitropack/types" {
     '/api/moderate': {
       'post': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/moderate.post').default>>>>
     }
+    '/api/posts': {
+      'post': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/posts.post').default>>>>
+    }
     '/api/report-post': {
       'post': Simplify<Serialize<Awaited<ReturnType<typeof import('../../server/api/report-post.post').default>>>>
     }

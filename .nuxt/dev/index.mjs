@@ -5,6 +5,7 @@ import nodeCrypto from 'node:crypto';
 import { parentPort, threadId } from 'node:worker_threads';
 import { defineEventHandler, handleCacheHeaders, splitCookiesString, createEvent, fetchWithEvent, isEvent, eventHandler, setHeaders, sendRedirect, proxyRequest, getRequestHeader, setResponseHeaders, setResponseStatus, send, getRequestHeaders, setResponseHeader, appendResponseHeader, getRequestURL, getResponseHeader, removeResponseHeader, createError, getQuery as getQuery$1, readBody, createApp, createRouter as createRouter$1, toNodeListener, lazyEventHandler, getResponseStatus, getRouterParam, getResponseStatusText } from 'file://H:/_Active/TextsMomv3/textsmom/node_modules/h3/dist/index.mjs';
 import { escapeHtml } from 'file://H:/_Active/TextsMomv3/textsmom/node_modules/@vue/shared/dist/shared.cjs.js';
+import { createClient } from 'file://H:/_Active/TextsMomv3/textsmom/node_modules/@supabase/supabase-js/dist/main/index.js';
 import nodemailer from 'file://H:/_Active/TextsMomv3/textsmom/node_modules/nodemailer/lib/nodemailer.js';
 import { createRenderer, getRequestDependencies, getPreloadLinks, getPrefetchLinks } from 'file://H:/_Active/TextsMomv3/textsmom/node_modules/vue-bundle-renderer/dist/runtime.mjs';
 import { parseURL, withoutBase, joinURL, getQuery, withQuery, withTrailingSlash, decodePath, withLeadingSlash, withoutTrailingSlash, joinRelativeURL } from 'file://H:/_Active/TextsMomv3/textsmom/node_modules/ufo/dist/index.mjs';
@@ -1118,7 +1119,22 @@ const plugins = [
 _WX8osOuIYMOpY7DsHJLnxRsQzW4to65CVLd4Gv8uU
 ];
 
-const assets = {};
+const assets = {
+  "/index.mjs": {
+    "type": "text/javascript; charset=utf-8",
+    "etag": "\"157fb-Bcz5NsmjDjGqRNzoUVwcmx4T9MA\"",
+    "mtime": "2025-08-05T04:54:02.335Z",
+    "size": 88059,
+    "path": "index.mjs"
+  },
+  "/index.mjs.map": {
+    "type": "application/json",
+    "etag": "\"5133a-q3VF/5e+R9oOaH1OHwLl9aZ1Az8\"",
+    "mtime": "2025-08-05T04:54:02.335Z",
+    "size": 332602,
+    "path": "index.mjs.map"
+  }
+};
 
 function readAsset (id) {
   const serverDir = dirname$1(fileURLToPath(globalThis._importMeta_.url));
@@ -1526,6 +1542,7 @@ async function getIslandContext(event) {
 }
 
 const _lazy_sQo3CN = () => Promise.resolve().then(function () { return moderate_post$1; });
+const _lazy_0W_7MH = () => Promise.resolve().then(function () { return posts_post$1; });
 const _lazy_URd68Y = () => Promise.resolve().then(function () { return reportPost_post$1; });
 const _lazy_jeBIS8 = () => Promise.resolve().then(function () { return sendEmail_post$1; });
 const _lazy_kSU_yd = () => Promise.resolve().then(function () { return renderer$1; });
@@ -1533,6 +1550,7 @@ const _lazy_kSU_yd = () => Promise.resolve().then(function () { return renderer$
 const handlers = [
   { route: '', handler: _AoJPBg, lazy: false, middleware: true, method: undefined },
   { route: '/api/moderate', handler: _lazy_sQo3CN, lazy: true, middleware: false, method: "post" },
+  { route: '/api/posts', handler: _lazy_0W_7MH, lazy: true, middleware: false, method: "post" },
   { route: '/api/report-post', handler: _lazy_URd68Y, lazy: true, middleware: false, method: "post" },
   { route: '/api/send-email', handler: _lazy_jeBIS8, lazy: true, middleware: false, method: "post" },
   { route: '/__nuxt_error', handler: _lazy_kSU_yd, lazy: true, middleware: false, method: undefined },
@@ -1980,6 +1998,33 @@ const moderate_post = defineEventHandler(async (event) => {
 const moderate_post$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
   __proto__: null,
   default: moderate_post
+}, Symbol.toStringTag, { value: 'Module' }));
+
+const posts_post = defineEventHandler(async (event) => {
+  const body = await readBody(event);
+  const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  );
+  const { data: post, error: insertError } = await supabase.from("posts").insert({
+    ...body,
+    status: "approved",
+    // Set status directly to approved
+    created_at: (/* @__PURE__ */ new Date()).toISOString()
+  }).select().single();
+  if (insertError) {
+    console.error("Error inserting post:", insertError);
+    throw createError({
+      statusCode: 500,
+      statusMessage: "Failed to submit post."
+    });
+  }
+  return { success: true, post };
+});
+
+const posts_post$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
+  __proto__: null,
+  default: posts_post
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const reportPost_post = defineEventHandler(async (event) => {

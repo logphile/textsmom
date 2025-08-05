@@ -931,25 +931,27 @@ useHead({
 
 // Supabase functions
 const addPost = async (postData) => {
-  const { data, error } = await supabase
-    .from('posts')
-    .insert([{
-      name: postData.name,
-      message: postData.message,
-      location: postData.location,
-      slug: postData.slug,
-      seoTitle: postData.seoTitle,
-      seoDescription: postData.seoDescription,
-      created_at: new Date().toISOString()
-    }])
-    .select()
+  try {
+    const response = await fetch('/api/posts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(postData),
+    });
 
-  if (error) {
-    console.error('Error adding post:', error)
-    return { post: null, error }
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Error adding post:', errorText);
+      return { post: null, error: new Error(errorText) };
+    }
+
+    const { post } = await response.json();
+    return { post, error: null };
+  } catch (error) {
+    console.error('Network or unexpected error in addPost:', error);
+    return { post: null, error };
   }
-
-  return { post: data[0], error: null }
 }
 
 const fetchPosts = async (page = 1, limit = 10) => {
