@@ -1,0 +1,1 @@
+export { default } from "file:///H:/_Active/TextsMomv3/textsmom/node_modules/@nuxt/vite-builder/dist/runtime/vite-node.mjs"
