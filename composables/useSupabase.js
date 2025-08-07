@@ -29,6 +29,9 @@ const initSupabase = () => {
   return supabase
 }
 
+// Export a shared client getter so all callers use the same initialized instance
+export const getSupabase = () => initSupabase()
+
 // Posts database functions
 export const usePosts = () => {
   // Fetch posts with pagination

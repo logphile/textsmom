@@ -728,12 +728,113 @@
 </template>
 
 <script setup>
-import { createClient } from '@supabase/supabase-js'
+import { getSupabase } from '../composables/useSupabase.js'
 
-// Supabase configuration
-const supabaseUrl = 'https://dkugwkjmxkdwgihlrcsh.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrdWd3a2pteGtkd2dpaGxyY3NoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI4ODA2MTEsImV4cCI6MjA2ODQ1NjYxMX0.4RuyeQBnX5JxnPbF37mqf6GkIsX2R04Cne-eUgjEcpY'
-const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Shared Supabase client (uses runtimeConfig/public or .env)
+const supabase = getSupabase()
+
+// -----------------------
+// Comment System (Supabase)
+// -----------------------
+// State
+const comments = ref({}) // { [post_id]: Array<Comment> }
+const newComment = ref({ author: '', content: '' })
+const isSubmittingComment = ref(false)
+// Track which posts have their comments expanded
+const expandedComments = ref({}) // { [post_id]: boolean }
+
+// Load all comments, grouped by post_id
+const loadAllComments = async () => {
+  try {
+    const { data, error } = await supabase
+      .from('comments')
+      .select('*')
+      .order('created_at', { ascending: true })
+
+    if (error) {
+      console.error('Error loading comments:', error)
+      return
+    }
+
+    comments.value = (data || []).reduce((acc, c) => {
+      (acc[c.post_id] ||= []).push(c)
+      return acc
+    }, {})
+  } catch (err) {
+    console.error('Unexpected error loading comments:', err)
+  }
+}
+
+onMounted(loadAllComments)
+
+// Accessors used by template
+const getPostComments = (postId) => comments.value[postId] || []
+const getCommentCount = (postId) => getPostComments(postId).length
+const isCommentsExpanded = (postId) => !!expandedComments.value[postId]
+
+// Toggle expanded state and scroll into view when expanding
+const toggleComments = async (postId) => {
+  expandedComments.value[postId] = !expandedComments.value[postId]
+  // If we just expanded, scroll to the comment section for this post
+  if (expandedComments.value[postId]) {
+    await nextTick()
+    const sections = document.querySelectorAll('.comment-section')
+    if (sections && sections.length) {
+      // Scroll the first visible comment section into view (closest to the click)
+      sections[0].scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
+}
+
+// Submit a new comment for a post
+const submitComment = async (postId) => {
+  const author = (newComment.value.author || '').trim()
+  const content = (newComment.value.content || '').trim()
+  if (!author || !content) return
+
+  isSubmittingComment.value = true
+  try {
+    console.log('[submitComment] payload:', { postId, author, content })
+    const { data: inserted, error } = await supabase
+      .from('comments')
+      .insert([{ 
+        post_id: Number(postId), 
+        author, 
+        // Write to both to handle schemas that still use comment_text with NOT NULL
+        content, 
+        comment_text: content,
+        created_at: new Date().toISOString()
+      }])
+
+    if (error) {
+      console.error('[submitComment] supabase error:', {
+        code: error.code, message: error.message, details: error.details, hint: error.hint
+      })
+      throw error
+    }
+
+    // Build normalized comment locally (no select-after-insert required)
+    const normalized = {
+      id: inserted?.[0]?.id ?? Math.random().toString(36).slice(2),
+      post_id: Number(postId),
+      author,
+      content,
+      created_at: new Date().toISOString()
+    }
+
+    // Update local cache so it appears immediately
+    comments.value[postId] = [ ...(comments.value[postId] || []), normalized ]
+
+    // Clear inputs
+    newComment.value.author = ''
+    newComment.value.content = ''
+  } catch (err) {
+    console.error('Comment submit error:', err)
+    alert('Failed to post comment.')
+  } finally {
+    isSubmittingComment.value = false
+  }
+}
 
 // SEO field generation functions (integrated directly)
 const generateSlug = (text, maxLength = 60) => {
@@ -1750,49 +1851,47 @@ const viewHomepage = async () => {
 // Load posts from Supabase
 const loadPosts = async () => {
   isLoading.value = true
-  
   try {
     console.log('Loading all posts...')
-    // Load ALL posts at once for client-side pagination
+    // Define pagination bounds (local, avoids ReferenceError if not set elsewhere)
+    const pageSize = 50
+    const from = 0
+    const to = from + pageSize - 1
+    console.log('[loadPosts] querying posts (paginated)')
     const { data, error, count } = await supabase
       .from('posts')
       .select('*', { count: 'exact' })
       .order('created_at', { ascending: false })
-    
-    if (error) {
-      console.error('Error fetching posts from Supabase:', error)
-      // Fallback to sample data with vote counts
-      posts.value = [
-        {
-          id: 1,
-          name: 'Sarah',
-          message: 'honey can you pick up some milk on your way home also your father says the lawn mower is broken again and we need to call someone but I dont know who to call do you know anyone',
-          location: 'California, United States',
-          created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-          likes: 0,
-          dislikes: 0
-        },
-        {
-          id: 2,
-          name: 'Mike',
-          message: 'Mom just texted: "The internet is down. How do I fix it? Also, what\'s my password for the email? And can you come over this weekend to help me with the TV remote? It\'s not working right."',
-          location: 'Texas, United States',
-          created_at: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),
-          likes: 0,
-          dislikes: 0
-        },
-        {
-          id: 3,
-          name: 'Jessica',
-          message: 'call me when you get this its important but not an emergency but kind of urgent but dont worry its nothing serious just call me ok love you',
-          location: 'Ontario, Canada',
-          created_at: new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString(),
-          likes: 0,
-          dislikes: 0
-        }
-      ]
-      totalPostsCount.value = 3
+      .range(from, to)
+    console.log('[loadPosts] result (paginated):', { length: data?.length || 0, count, error })
+
+    if (error || !data || data.length === 0) {
+      console.warn('[loadPosts] paginated query empty or errored; retrying simple select without range')
+      const { data: dataAll, error: errAll } = await supabase
+        .from('posts')
+        .select('*')
+        .order('created_at', { ascending: false })
+      console.log('[loadPosts] result (simple):', { length: dataAll?.length || 0, error: errAll })
+      if (errAll) {
+        console.error('Error loading posts (simple):', errAll)
+        posts.value = []
+        totalPostsCount.value = 0
+        return
+      }
+      // Use simple results
+      posts.value = dataAll || []
+      totalPostsCount.value = dataAll?.length || 0
       return
+    }
+
+    if (data && data.length > 0) {
+      // Specific post lookup for debugging purposes
+      if (data.some(p => p.id === 68)) {
+        console.log('Post 68 found in loaded data')
+      } else {
+        console.log('Post 68 not found in loaded data')
+        console.log('Available post IDs:', data.map(p => p.id))
+      }
     }
     
     console.log('Posts loaded from Supabase:', data?.length || 0, 'posts')
@@ -1812,7 +1911,7 @@ const loadPosts = async () => {
     totalPostsCount.value = count || 0
     
   } catch (error) {
-    console.error('Error loading posts:', error)
+    console.error('Error loading posts (exception):', error)
     // Fallback to empty array
     posts.value = []
     totalPostsCount.value = 0
@@ -1850,115 +1949,7 @@ const formatDate = (dateString) => {
   }).format(date)
 }
 
-// Comment functionality
-const comments = ref({})
-const expandedComments = ref(new Set())
-const newComment = ref({
-  author: '',
-  content: ''
-})
-const isSubmittingComment = ref(false)
-
-// Toggle comment section visibility
-const toggleComments = (postId) => {
-  if (expandedComments.value.has(postId)) {
-    expandedComments.value.delete(postId)
-  } else {
-    expandedComments.value.add(postId)
-  }
-}
-
-// Check if comments are expanded for a post
-const isCommentsExpanded = (postId) => {
-  return expandedComments.value.has(postId)
-}
-
-// Get comments for a specific post
-const getPostComments = (postId) => {
-  return comments.value[postId] || []
-}
-
-// Get comment count for a post
-const getCommentCount = (postId) => {
-  return (comments.value[postId] || []).length
-}
-
-// Submit a new comment
-const submitComment = async (postId) => {
-  if (!newComment.value.author.trim() || !newComment.value.content.trim()) {
-    return
-  }
-  
-  isSubmittingComment.value = true
-  
-  try {
-    // Create new comment object
-    const comment = {
-      id: Date.now(), // Temporary ID - will be replaced with proper DB ID later
-      author: newComment.value.author.trim(),
-      content: newComment.value.content.trim(),
-      created_at: new Date().toISOString(),
-      post_id: postId
-    }
-    
-    // Add comment to local state
-    if (!comments.value[postId]) {
-      comments.value[postId] = []
-    }
-    comments.value[postId].push(comment)
-    
-    // TODO: Add API call to save comment to database
-    // await addCommentToDatabase(comment)
-    
-    // Clear form
-    newComment.value.author = ''
-    newComment.value.content = ''
-    
-    console.log('Comment added successfully:', comment)
-    
-  } catch (error) {
-    console.error('Error adding comment:', error)
-    // TODO: Show error message to user
-  } finally {
-    isSubmittingComment.value = false
-  }
-}
-
-// Initialize with some sample comments for testing
-const initializeSampleComments = () => {
-  comments.value = {
-    1: [
-      {
-        id: 1,
-        author: 'Sarah',
-        content: 'OMG this is so my mom! 😂',
-        created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        post_id: 1
-      },
-      {
-        id: 2,
-        author: 'Mike',
-        content: 'Classic mom move right there',
-        created_at: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-        post_id: 1
-      }
-    ],
-    2: [
-      {
-        id: 3,
-        author: 'Jenny',
-        content: 'The struggle is real! My mom does this too',
-        created_at: new Date(Date.now() - 30 * 60 * 1000).toISOString(),
-        post_id: 2
-      }
-    ]
-  }
-}
-
-// Initialize sample comments when component mounts
-onMounted(() => {
-  initializeSampleComments()
-})
+// (Removed legacy sample comment logic. Using Supabase-backed implementation defined above.)
 
 // Individual Post Navigation
 const currentPost = ref(null)
