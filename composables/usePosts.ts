@@ -1,18 +1,24 @@
 // ~/composables/usePosts.ts
 import { ref } from 'vue'
-import { useSupabase } from './useSupabase'
+import { useSupabase } from './useSupabase.js'
 
 export type PostRecord = Record<string, any>
 
 export function usePosts() {
-  const { supabase } = useSupabase()
-
   const posts = ref<PostRecord[]>([])
   const isLoading = ref(false)
   const totalPostsCount = ref(0)
 
   // Load recent posts with a safe paginated query, then simple fallback
   const loadPosts = async () => {
+    // Ensure we only attempt to use Supabase on the client. Nuxt already calls
+    // this from onMounted in app.vue, but this extra guard keeps the composable
+    // SSR-safe if invoked elsewhere.
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const { supabase } = useSupabase()
     isLoading.value = true
     try {
       // Paginated attempt
