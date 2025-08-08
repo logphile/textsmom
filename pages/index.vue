@@ -8,7 +8,7 @@
         <div class="fade-word fade-word-3">CONFUSING.</div>
       </div>
       <div class="main-blurb2">
-      You know a<span class="blurb2"> mom </span>text when you see one.
+      <span class="typewriter">YOU KNOW A<span class="blurb2"> MOM </span>TEXT WHEN YOU SEE ONE.</span>
       </div>
       <hr class="site-hr2">
       <div class="main-postit">
@@ -33,6 +33,7 @@
   margin-left: 1.75rem;
   margin-top: 3rem;
   line-height: 1rem;
+  text-transform: uppercase;
 }
 
 .blurb2 {
@@ -91,6 +92,26 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Typewriter effect */
+.typewriter {
+  display: inline-block;
+  overflow: hidden; /* Ensures the text is hidden until typed */
+  white-space: nowrap; /* Keeps the text on a single line */
+  border-right: 0.15em solid #FF007A; /* Cursor */
+  /* 37ch roughly matches the character count of the sentence */
+  animation: typing 3.2s steps(37, end), blink-caret 0.75s step-end infinite;
+}
+
+@keyframes typing {
+  from { width: 0; }
+  to { width: 37ch; }
+}
+
+@keyframes blink-caret {
+  from, to { border-color: transparent; }
+  50% { border-color: #FF007A; }
 }
 
 /* Main content styling */

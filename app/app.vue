@@ -358,7 +358,7 @@
         <div class="fade-word fade-word-3">CONFUSING<span class="green-period">.</span></div>
       </div>
       <div class="main-blurb2">
-      You know a <span class="blurb2">mom</span> text when you see one<span class="green-period">.</span>
+      <span class="typewriter">YOU KNOW A <span class="blurb2">MOM</span> TEXT WHEN YOU SEE ONE<span class="green-period">.</span></span>
       </div>
       <hr class="site-hr2">
       <div class="main-postit">
@@ -730,13 +730,15 @@
 </template>
 
 <script setup>
+ import { useComments } from '../composables/useComments'
+ import { usePosts } from '../composables/usePosts'
+ 
+ // Supabase is now accessed only inside composables (usePosts/useComments)
 
-// Supabase is now accessed only inside composables (usePosts/useComments)
-
-// -----------------------
-// Comment System (Composable)
-// -----------------------
-const {
+ // -----------------------
+ // Comment System (Composable)
+ // -----------------------
+ const {
   comments,
   loadAllComments,
   getCommentsForPost,
@@ -2325,6 +2327,7 @@ a:hover {
 .site-nav {
   display: flex;
   gap: 1rem;
+  align-items: center; /* vertically center nav items so text links align with bubble buttons */
 }
 
 /* Mobile navigation */
@@ -2528,6 +2531,12 @@ a:hover {
 
 .nav-link:hover {
   color: #00FFB3;
+}
+
+/* Nudge plain text links (ABOUT, CONTACT) down slightly on desktop to align with bubble buttons */
+.site-nav.desktop-nav .nav-link:not(.nav-link-texts):not(.nav-link-post) {
+  position: relative;
+  top: 2px; /* adjust as needed (1-3px) */
 }
 
 .nav-link-post {
@@ -4516,5 +4525,43 @@ img {
   }
 }
 
-</style>
+/* Typewriter effect for homepage hero sentence */
+.main-blurb2 {
+  /* keep existing layout; effect applied to child span */
+}
 
+.main-blurb2 .typewriter {
+  display: inline-block;
+  overflow: hidden; /* clip as it types */
+  white-space: nowrap; /* single line */
+  vertical-align: bottom;
+  border-right: none; /* remove caret */
+  --type-ch: 37; /* approx char count */
+  width: 0; /* start hidden */
+  animation: typing 2.8s steps(var(--type-ch), end) 0.3s forwards; /* typing only, no blink */
+}
+
+/* Match hero font (same as UNHINGED/DERANGED/CONFUSING) */
+.main-blurb2,
+.main-blurb2 .typewriter,
+.main-blurb2 .typewriter .blurb2 {
+  font-family: 'Bebas Neue', sans-serif;
+}
+
+@keyframes typing {
+  to { width: calc(var(--type-ch) * 1ch); }
+}
+
+@keyframes blink-caret {
+  50% { border-color: transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-blurb2 .typewriter {
+    width: auto;
+    animation: none;
+    border-right: none;
+  }
+}
+
+</style>

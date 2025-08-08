@@ -1,2 +1,11 @@
-User-Agent: *
-Disallow:
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /_nuxt/
+Disallow: /admin/
+
+# Sitemap location
+Sitemap: https://texts.mom/sitemap.xml
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1

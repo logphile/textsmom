@@ -1,7 +1,8 @@
-import { hasInjectionContext, getCurrentInstance, inject, defineComponent, createElementBlock, createApp, provide, toRef, onErrorCaptured, onServerPrefetch, unref, createVNode, resolveDynamicComponent, shallowReactive, reactive, effectScope, computed, h, isReadonly, isRef, isShallow, isReactive, toRaw, defineAsyncComponent, mergeProps, getCurrentScope, useSSRContext } from 'vue';
-import { k as hasProtocol, l as isScriptProtocol, m as joinURL, w as withQuery, n as sanitizeStatusCode, o as getContext, $ as $fetch, p as createHooks, h as createError$1, q as isEqual, r as stringifyParsedURL, v as stringifyQuery, x as parseQuery, y as toRouteMatcher, z as createRouter, A as defu } from '../_/nitro.mjs';
+import { defineComponent, shallowRef, h, resolveComponent, computed, hasInjectionContext, inject, getCurrentInstance, createElementBlock, provide, cloneVNode, createApp, toRef, onErrorCaptured, onServerPrefetch, unref, createVNode, resolveDynamicComponent, shallowReactive, reactive, effectScope, isReadonly, isRef, isShallow, isReactive, toRaw, defineAsyncComponent, mergeProps, ref, watch, withAsyncContext, withCtx, createTextVNode, getCurrentScope, toValue, nextTick, useSSRContext } from 'vue';
+import { p as parseQuery, l as hasProtocol, m as joinURL, w as withQuery, n as withTrailingSlash, o as withoutTrailingSlash, q as isScriptProtocol, v as sanitizeStatusCode, x as getContext, $ as $fetch, y as createHooks, e as createError$1, z as isEqual, A as stringifyParsedURL, B as stringifyQuery, C as toRouteMatcher, D as createRouter, E as defu } from '../_/nitro.mjs';
 import { u as useHead$1, h as headSymbol, b as baseURL } from '../routes/renderer.mjs';
-import { ssrRenderSuspense, ssrRenderComponent, ssrRenderVNode, ssrRenderAttrs } from 'vue/server-renderer';
+import { ssrRenderSuspense, ssrRenderComponent, ssrRenderVNode, ssrRenderAttrs, ssrRenderClass, ssrRenderAttr, ssrInterpolate, ssrIncludeBooleanAttr, ssrLooseContain, ssrLooseEqual, ssrRenderList } from 'vue/server-renderer';
+import { createClient } from '@supabase/supabase-js';
 import 'node:http';
 import 'node:https';
 import 'node:events';
@@ -15,6 +16,62 @@ import 'unhead/server';
 import 'devalue';
 import 'unhead/utils';
 
+const DEBOUNCE_DEFAULTS = {
+  trailing: true
+};
+function debounce(fn, wait = 25, options = {}) {
+  options = { ...DEBOUNCE_DEFAULTS, ...options };
+  if (!Number.isFinite(wait)) {
+    throw new TypeError("Expected `wait` to be a finite number");
+  }
+  let leadingValue;
+  let timeout;
+  let resolveList = [];
+  let currentPromise;
+  let trailingArgs;
+  const applyFn = (_this, args) => {
+    currentPromise = _applyPromised(fn, _this, args);
+    currentPromise.finally(() => {
+      currentPromise = null;
+      if (options.trailing && trailingArgs && !timeout) {
+        const promise = applyFn(_this, trailingArgs);
+        trailingArgs = null;
+        return promise;
+      }
+    });
+    return currentPromise;
+  };
+  return function(...args) {
+    if (currentPromise) {
+      if (options.trailing) {
+        trailingArgs = args;
+      }
+      return currentPromise;
+    }
+    return new Promise((resolve) => {
+      const shouldCallNow = !timeout && options.leading;
+      clearTimeout(timeout);
+      timeout = setTimeout(() => {
+        timeout = null;
+        const promise = options.leading ? leadingValue : applyFn(this, args);
+        for (const _resolve of resolveList) {
+          _resolve(promise);
+        }
+        resolveList = [];
+      }, wait);
+      if (shouldCallNow) {
+        leadingValue = applyFn(this, args);
+        resolve(leadingValue);
+      } else {
+        resolveList.push(resolve);
+      }
+    });
+  };
+}
+async function _applyPromised(fn, _this, args) {
+  return await fn.apply(_this, args);
+}
+
 if (!globalThis.$fetch) {
   globalThis.$fetch = $fetch.create({
     baseURL: baseURL()
@@ -24,6 +81,7 @@ if (!("global" in globalThis)) {
   globalThis.global = globalThis;
 }
 const nuxtLinkDefaults = { "componentName": "NuxtLink" };
+const asyncDataDefaults = { "deep": false };
 const appId = "nuxt-app";
 function getNuxtAppCtx(id = appId) {
   return getContext(id, {
@@ -621,75 +679,1411 @@ const plugins = [
   revive_payload_server_MVtmlZaQpj6ApFmshWfUWl5PehCebzaBf2NuRMiIbms,
   components_plugin_4kY4pyzJIYX99vmMAAIorFf3CnAaptHitJgf7JxiED8
 ];
-const __nuxt_component_0 = defineComponent({
+const __nuxt_component_0$1 = defineComponent({
   name: "ServerPlaceholder",
   render() {
     return createElementBlock("div");
   }
 });
-const _export_sfc = (sfc, props) => {
-  const target = sfc.__vccOpts || sfc;
-  for (const [key, val] of props) {
-    target[key] = val;
+const firstNonUndefined = (...args) => args.find((arg) => arg !== void 0);
+// @__NO_SIDE_EFFECTS__
+function defineNuxtLink(options) {
+  const componentName = options.componentName || "NuxtLink";
+  function isHashLinkWithoutHashMode(link) {
+    return typeof link === "string" && link.startsWith("#");
   }
-  return target;
-};
-const _sfc_main$3 = {
-  __name: "NuxtWelcome",
-  __ssrInlineRender: true,
-  props: {
-    appName: {
-      type: String,
-      default: "Nuxt"
-    },
-    title: {
-      type: String,
-      default: "Welcome to Nuxt!"
+  function resolveTrailingSlashBehavior(to, resolve, trailingSlash) {
+    const effectiveTrailingSlash = trailingSlash ?? options.trailingSlash;
+    if (!to || effectiveTrailingSlash !== "append" && effectiveTrailingSlash !== "remove") {
+      return to;
     }
-  },
-  setup(__props) {
-    const props = __props;
+    if (typeof to === "string") {
+      return applyTrailingSlashBehavior(to, effectiveTrailingSlash);
+    }
+    const path = "path" in to && to.path !== void 0 ? to.path : resolve(to).path;
+    const resolvedPath = {
+      ...to,
+      name: void 0,
+      // named routes would otherwise always override trailing slash behavior
+      path: applyTrailingSlashBehavior(path, effectiveTrailingSlash)
+    };
+    return resolvedPath;
+  }
+  function useNuxtLink(props) {
+    const router = useRouter();
+    const config = /* @__PURE__ */ useRuntimeConfig();
+    const hasTarget = computed(() => !!props.target && props.target !== "_self");
+    const isAbsoluteUrl = computed(() => {
+      const path = props.to || props.href || "";
+      return typeof path === "string" && hasProtocol(path, { acceptRelative: true });
+    });
+    const builtinRouterLink = resolveComponent("RouterLink");
+    const useBuiltinLink = builtinRouterLink && typeof builtinRouterLink !== "string" ? builtinRouterLink.useLink : void 0;
+    const isExternal = computed(() => {
+      if (props.external) {
+        return true;
+      }
+      const path = props.to || props.href || "";
+      if (typeof path === "object") {
+        return false;
+      }
+      return path === "" || isAbsoluteUrl.value;
+    });
+    const to = computed(() => {
+      const path = props.to || props.href || "";
+      if (isExternal.value) {
+        return path;
+      }
+      return resolveTrailingSlashBehavior(path, router.resolve, props.trailingSlash);
+    });
+    const link = isExternal.value ? void 0 : useBuiltinLink?.({ ...props, to });
+    const href = computed(() => {
+      const effectiveTrailingSlash = props.trailingSlash ?? options.trailingSlash;
+      if (!to.value || isAbsoluteUrl.value || isHashLinkWithoutHashMode(to.value)) {
+        return to.value;
+      }
+      if (isExternal.value) {
+        const path = typeof to.value === "object" && "path" in to.value ? resolveRouteObject(to.value) : to.value;
+        const href2 = typeof path === "object" ? router.resolve(path).href : path;
+        return applyTrailingSlashBehavior(href2, effectiveTrailingSlash);
+      }
+      if (typeof to.value === "object") {
+        return router.resolve(to.value)?.href ?? null;
+      }
+      return applyTrailingSlashBehavior(joinURL(config.app.baseURL, to.value), effectiveTrailingSlash);
+    });
+    return {
+      to,
+      hasTarget,
+      isAbsoluteUrl,
+      isExternal,
+      //
+      href,
+      isActive: link?.isActive ?? computed(() => to.value === router.currentRoute.value.path),
+      isExactActive: link?.isExactActive ?? computed(() => to.value === router.currentRoute.value.path),
+      route: link?.route ?? computed(() => router.resolve(to.value)),
+      async navigate(_e) {
+        await navigateTo(href.value, { replace: props.replace, external: isExternal.value || hasTarget.value });
+      }
+    };
+  }
+  return defineComponent({
+    name: componentName,
+    props: {
+      // Routing
+      to: {
+        type: [String, Object],
+        default: void 0,
+        required: false
+      },
+      href: {
+        type: [String, Object],
+        default: void 0,
+        required: false
+      },
+      // Attributes
+      target: {
+        type: String,
+        default: void 0,
+        required: false
+      },
+      rel: {
+        type: String,
+        default: void 0,
+        required: false
+      },
+      noRel: {
+        type: Boolean,
+        default: void 0,
+        required: false
+      },
+      // Prefetching
+      prefetch: {
+        type: Boolean,
+        default: void 0,
+        required: false
+      },
+      prefetchOn: {
+        type: [String, Object],
+        default: void 0,
+        required: false
+      },
+      noPrefetch: {
+        type: Boolean,
+        default: void 0,
+        required: false
+      },
+      // Styling
+      activeClass: {
+        type: String,
+        default: void 0,
+        required: false
+      },
+      exactActiveClass: {
+        type: String,
+        default: void 0,
+        required: false
+      },
+      prefetchedClass: {
+        type: String,
+        default: void 0,
+        required: false
+      },
+      // Vue Router's `<RouterLink>` additional props
+      replace: {
+        type: Boolean,
+        default: void 0,
+        required: false
+      },
+      ariaCurrentValue: {
+        type: String,
+        default: void 0,
+        required: false
+      },
+      // Edge cases handling
+      external: {
+        type: Boolean,
+        default: void 0,
+        required: false
+      },
+      // Slot API
+      custom: {
+        type: Boolean,
+        default: void 0,
+        required: false
+      },
+      // Behavior
+      trailingSlash: {
+        type: String,
+        default: void 0,
+        required: false
+      }
+    },
+    useLink: useNuxtLink,
+    setup(props, { slots }) {
+      const router = useRouter();
+      const { to, href, navigate, isExternal, hasTarget, isAbsoluteUrl } = useNuxtLink(props);
+      shallowRef(false);
+      const el = void 0;
+      const elRef = void 0;
+      async function prefetch(nuxtApp = useNuxtApp()) {
+        {
+          return;
+        }
+      }
+      return () => {
+        if (!isExternal.value && !hasTarget.value && !isHashLinkWithoutHashMode(to.value)) {
+          const routerLinkProps = {
+            ref: elRef,
+            to: to.value,
+            activeClass: props.activeClass || options.activeClass,
+            exactActiveClass: props.exactActiveClass || options.exactActiveClass,
+            replace: props.replace,
+            ariaCurrentValue: props.ariaCurrentValue,
+            custom: props.custom
+          };
+          if (!props.custom) {
+            routerLinkProps.rel = props.rel || void 0;
+          }
+          return h(
+            resolveComponent("RouterLink"),
+            routerLinkProps,
+            slots.default
+          );
+        }
+        const target = props.target || null;
+        const rel = firstNonUndefined(
+          // converts `""` to `null` to prevent the attribute from being added as empty (`rel=""`)
+          props.noRel ? "" : props.rel,
+          options.externalRelAttribute,
+          /*
+          * A fallback rel of `noopener noreferrer` is applied for external links or links that open in a new tab.
+          * This solves a reverse tabnapping security flaw in browsers pre-2021 as well as improving privacy.
+          */
+          isAbsoluteUrl.value || hasTarget.value ? "noopener noreferrer" : ""
+        ) || null;
+        if (props.custom) {
+          if (!slots.default) {
+            return null;
+          }
+          return slots.default({
+            href: href.value,
+            navigate,
+            prefetch,
+            get route() {
+              if (!href.value) {
+                return void 0;
+              }
+              const url = new URL(href.value, "http://localhost");
+              return {
+                path: url.pathname,
+                fullPath: url.pathname,
+                get query() {
+                  return parseQuery(url.search);
+                },
+                hash: url.hash,
+                params: {},
+                name: void 0,
+                matched: [],
+                redirectedFrom: void 0,
+                meta: {},
+                href: href.value
+              };
+            },
+            rel,
+            target,
+            isExternal: isExternal.value || hasTarget.value,
+            isActive: false,
+            isExactActive: false
+          });
+        }
+        return h("a", {
+          ref: el,
+          href: href.value || null,
+          // converts `""` to `null` to prevent the attribute from being added as empty (`href=""`)
+          rel,
+          target,
+          onClick: (event) => {
+            if (isExternal.value || hasTarget.value) {
+              return;
+            }
+            event.preventDefault();
+            return props.replace ? router.replace(href.value) : router.push(href.value);
+          }
+        }, slots.default?.());
+      };
+    }
+    // }) as unknown as DefineComponent<NuxtLinkProps, object, object, ComputedOptions, MethodOptions, object, object, EmitsOptions, string, object, NuxtLinkProps, object, SlotsType<NuxtLinkSlots>>
+  });
+}
+const __nuxt_component_0 = /* @__PURE__ */ defineNuxtLink(nuxtLinkDefaults);
+function applyTrailingSlashBehavior(to, trailingSlash) {
+  const normalizeFn = trailingSlash === "append" ? withTrailingSlash : withoutTrailingSlash;
+  const hasProtocolDifferentFromHttp = hasProtocol(to) && !to.startsWith("http");
+  if (hasProtocolDifferentFromHttp) {
+    return to;
+  }
+  return normalizeFn(to, true);
+}
+let supabaseClient = null;
+const useSupabase = () => {
+  const config = /* @__PURE__ */ useRuntimeConfig();
+  const url = config.public?.supabaseUrl;
+  const anonKey = config.public?.supabaseAnonKey;
+  if (!url || !anonKey) {
+    console.warn("[useSupabase] Missing supabaseUrl or supabaseAnonKey in runtimeConfig.public");
+  }
+  if (!supabaseClient) {
+    supabaseClient = createClient(url, anonKey);
+  }
+  return { supabase: supabaseClient };
+};
+function useComments() {
+  const getToast = () => {
+    {
+      return { success: (_msg) => {
+      }, error: (_msg) => {
+      } };
+    }
+  };
+  const comments = ref({});
+  const isSubmitting = ref(false);
+  const errorMessage = ref("");
+  const loadAllComments = async () => {
+    return;
+  };
+  const getCommentsForPost = (postId) => {
+    return comments.value[postId] || [];
+  };
+  const isPostDisabled = (author, content) => !author?.trim() || !content?.trim() || isSubmitting.value;
+  const submitComment = async (postId, author, content) => {
+    if (isPostDisabled(author, content)) return;
+    errorMessage.value = "";
+    isSubmitting.value = true;
+    const pid = Number(postId);
+    const optimistic = {
+      id: void 0,
+      post_id: pid,
+      author: author.trim(),
+      content: content.trim(),
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    comments.value[pid] = [...comments.value[pid] || [], optimistic];
+    try {
+      if (true) throw new Error("Cannot submit on server");
+      const { supabase: supabase2 } = useSupabase();
+      const { error } = await supabase2.from("comments").insert([
+        {
+          post_id: pid,
+          author: optimistic.author,
+          content: optimistic.content,
+          // Write both fields to satisfy schemas where comment_text is NOT NULL
+          comment_text: optimistic.content
+        }
+      ]);
+      if (error) throw error;
+      getToast().success("Comment posted!");
+    } catch (err) {
+      console.error("Failed to post comment", err);
+      errorMessage.value = err?.message || "Failed to post comment.";
+      comments.value[pid] = (comments.value[pid] || []).filter((c) => c !== optimistic);
+      getToast().error(errorMessage.value);
+    } finally {
+      isSubmitting.value = false;
+    }
+  };
+  return {
+    comments,
+    loadAllComments,
+    getCommentsForPost,
+    submitComment,
+    isSubmitting,
+    isPostDisabled,
+    errorMessage
+  };
+}
+function usePosts() {
+  const posts = ref([]);
+  const isLoading = ref(false);
+  const totalPostsCount = ref(0);
+  const loadPosts = async (opts) => {
+    {
+      if (process?.env?.NITRO_LOG_LEVEL === "debug") {
+        console.warn("[usePosts] loadPosts skipped on server (SSR)");
+      }
+      return;
+    }
+  };
+  return { posts, isLoading, totalPostsCount, loadPosts };
+}
+const clientOnlySymbol = Symbol.for("nuxt:client-only");
+defineComponent({
+  name: "ClientOnly",
+  inheritAttrs: false,
+  props: ["fallback", "placeholder", "placeholderTag", "fallbackTag"],
+  setup(props, { slots, attrs }) {
+    const mounted = shallowRef(false);
+    const vm = getCurrentInstance();
+    if (vm) {
+      vm._nuxtClientOnly = true;
+    }
+    provide(clientOnlySymbol, true);
+    return () => {
+      if (mounted.value) {
+        const vnodes = slots.default?.();
+        if (vnodes && vnodes.length === 1) {
+          return [cloneVNode(vnodes[0], attrs)];
+        }
+        return vnodes;
+      }
+      const slot = slots.fallback || slots.placeholder;
+      if (slot) {
+        return h(slot);
+      }
+      const fallbackStr = props.fallback || props.placeholder || "";
+      const fallbackTag = props.fallbackTag || props.placeholderTag || "span";
+      return createElementBlock(fallbackTag, attrs, fallbackStr);
+    };
+  }
+});
+function useAsyncData(...args) {
+  const autoKey = typeof args[args.length - 1] === "string" ? args.pop() : void 0;
+  if (_isAutoKeyNeeded(args[0], args[1])) {
+    args.unshift(autoKey);
+  }
+  let [_key, _handler, options = {}] = args;
+  const key = computed(() => toValue(_key));
+  if (typeof key.value !== "string") {
+    throw new TypeError("[nuxt] [useAsyncData] key must be a string.");
+  }
+  if (typeof _handler !== "function") {
+    throw new TypeError("[nuxt] [useAsyncData] handler must be a function.");
+  }
+  const nuxtApp = useNuxtApp();
+  options.server ??= true;
+  options.default ??= getDefault;
+  options.getCachedData ??= getDefaultCachedData;
+  options.lazy ??= false;
+  options.immediate ??= true;
+  options.deep ??= asyncDataDefaults.deep;
+  options.dedupe ??= "cancel";
+  options._functionName || "useAsyncData";
+  nuxtApp._asyncData[key.value];
+  const initialFetchOptions = { cause: "initial", dedupe: options.dedupe };
+  if (!nuxtApp._asyncData[key.value]?._init) {
+    initialFetchOptions.cachedData = options.getCachedData(key.value, nuxtApp, { cause: "initial" });
+    nuxtApp._asyncData[key.value] = createAsyncData(nuxtApp, key.value, _handler, options, initialFetchOptions.cachedData);
+  }
+  const asyncData = nuxtApp._asyncData[key.value];
+  asyncData._deps++;
+  const initialFetch = () => nuxtApp._asyncData[key.value].execute(initialFetchOptions);
+  const fetchOnServer = options.server !== false && nuxtApp.payload.serverRendered;
+  if (fetchOnServer && options.immediate) {
+    const promise = initialFetch();
+    if (getCurrentInstance()) {
+      onServerPrefetch(() => promise);
+    } else {
+      nuxtApp.hook("app:created", async () => {
+        await promise;
+      });
+    }
+  }
+  const asyncReturn = {
+    data: writableComputedRef(() => nuxtApp._asyncData[key.value]?.data),
+    pending: writableComputedRef(() => nuxtApp._asyncData[key.value]?.pending),
+    status: writableComputedRef(() => nuxtApp._asyncData[key.value]?.status),
+    error: writableComputedRef(() => nuxtApp._asyncData[key.value]?.error),
+    refresh: (...args2) => nuxtApp._asyncData[key.value].execute(...args2),
+    execute: (...args2) => nuxtApp._asyncData[key.value].execute(...args2),
+    clear: () => clearNuxtDataByKey(nuxtApp, key.value)
+  };
+  const asyncDataPromise = Promise.resolve(nuxtApp._asyncDataPromises[key.value]).then(() => asyncReturn);
+  Object.assign(asyncDataPromise, asyncReturn);
+  return asyncDataPromise;
+}
+function writableComputedRef(getter) {
+  return computed({
+    get() {
+      return getter()?.value;
+    },
+    set(value) {
+      const ref2 = getter();
+      if (ref2) {
+        ref2.value = value;
+      }
+    }
+  });
+}
+function _isAutoKeyNeeded(keyOrFetcher, fetcher) {
+  if (typeof keyOrFetcher === "string") {
+    return false;
+  }
+  if (typeof keyOrFetcher === "object" && keyOrFetcher !== null) {
+    return false;
+  }
+  if (typeof keyOrFetcher === "function" && typeof fetcher === "function") {
+    return false;
+  }
+  return true;
+}
+function clearNuxtDataByKey(nuxtApp, key) {
+  if (key in nuxtApp.payload.data) {
+    nuxtApp.payload.data[key] = void 0;
+  }
+  if (key in nuxtApp.payload._errors) {
+    nuxtApp.payload._errors[key] = void 0;
+  }
+  if (nuxtApp._asyncData[key]) {
+    nuxtApp._asyncData[key].data.value = unref(nuxtApp._asyncData[key]._default());
+    nuxtApp._asyncData[key].error.value = void 0;
+    nuxtApp._asyncData[key].status.value = "idle";
+  }
+  if (key in nuxtApp._asyncDataPromises) {
+    if (nuxtApp._asyncDataPromises[key]) {
+      nuxtApp._asyncDataPromises[key].cancelled = true;
+    }
+    nuxtApp._asyncDataPromises[key] = void 0;
+  }
+}
+function pick(obj, keys) {
+  const newObj = {};
+  for (const key of keys) {
+    newObj[key] = obj[key];
+  }
+  return newObj;
+}
+function createAsyncData(nuxtApp, key, _handler, options, initialCachedData) {
+  nuxtApp.payload._errors[key] ??= void 0;
+  const hasCustomGetCachedData = options.getCachedData !== getDefaultCachedData;
+  const handler = _handler ;
+  const _ref = options.deep ? ref : shallowRef;
+  const hasCachedData = initialCachedData !== void 0;
+  const unsubRefreshAsyncData = nuxtApp.hook("app:data:refresh", async (keys) => {
+    if (!keys || keys.includes(key)) {
+      await asyncData.execute({ cause: "refresh:hook" });
+    }
+  });
+  const asyncData = {
+    data: _ref(hasCachedData ? initialCachedData : options.default()),
+    pending: computed(() => asyncData.status.value === "pending"),
+    error: toRef(nuxtApp.payload._errors, key),
+    status: shallowRef("idle"),
+    execute: (...args) => {
+      const [_opts, newValue = void 0] = args;
+      const opts = _opts && newValue === void 0 && typeof _opts === "object" ? _opts : {};
+      if (nuxtApp._asyncDataPromises[key]) {
+        if ((opts.dedupe ?? options.dedupe) === "defer") {
+          return nuxtApp._asyncDataPromises[key];
+        }
+        nuxtApp._asyncDataPromises[key].cancelled = true;
+      }
+      {
+        const cachedData = "cachedData" in opts ? opts.cachedData : options.getCachedData(key, nuxtApp, { cause: opts.cause ?? "refresh:manual" });
+        if (cachedData !== void 0) {
+          nuxtApp.payload.data[key] = asyncData.data.value = cachedData;
+          asyncData.error.value = void 0;
+          asyncData.status.value = "success";
+          return Promise.resolve(cachedData);
+        }
+      }
+      asyncData.status.value = "pending";
+      const promise = new Promise(
+        (resolve, reject) => {
+          try {
+            resolve(handler(nuxtApp));
+          } catch (err) {
+            reject(err);
+          }
+        }
+      ).then(async (_result) => {
+        if (promise.cancelled) {
+          return nuxtApp._asyncDataPromises[key];
+        }
+        let result = _result;
+        if (options.transform) {
+          result = await options.transform(_result);
+        }
+        if (options.pick) {
+          result = pick(result, options.pick);
+        }
+        nuxtApp.payload.data[key] = result;
+        asyncData.data.value = result;
+        asyncData.error.value = void 0;
+        asyncData.status.value = "success";
+      }).catch((error) => {
+        if (promise.cancelled) {
+          return nuxtApp._asyncDataPromises[key];
+        }
+        asyncData.error.value = createError(error);
+        asyncData.data.value = unref(options.default());
+        asyncData.status.value = "error";
+      }).finally(() => {
+        if (promise.cancelled) {
+          return;
+        }
+        delete nuxtApp._asyncDataPromises[key];
+      });
+      nuxtApp._asyncDataPromises[key] = promise;
+      return nuxtApp._asyncDataPromises[key];
+    },
+    _execute: debounce((...args) => asyncData.execute(...args), 0, { leading: true }),
+    _default: options.default,
+    _deps: 0,
+    _init: true,
+    _hash: void 0,
+    _off: () => {
+      unsubRefreshAsyncData();
+      if (nuxtApp._asyncData[key]?._init) {
+        nuxtApp._asyncData[key]._init = false;
+      }
+      if (!hasCustomGetCachedData) {
+        nextTick(() => {
+          if (!nuxtApp._asyncData[key]?._init) {
+            clearNuxtDataByKey(nuxtApp, key);
+            asyncData.execute = () => Promise.resolve();
+          }
+        });
+      }
+    }
+  };
+  return asyncData;
+}
+const getDefault = () => void 0;
+const getDefaultCachedData = (key, nuxtApp, ctx) => {
+  if (nuxtApp.isHydrating) {
+    return nuxtApp.payload.data[key];
+  }
+  if (ctx.cause !== "refresh:manual" && ctx.cause !== "refresh:hook") {
+    return nuxtApp.static.data[key];
+  }
+};
+const postsPerPage = 10;
+const _sfc_main$2 = {
+  __name: "app",
+  __ssrInlineRender: true,
+  async setup(__props) {
+    let __temp, __restore;
+    const {
+      getCommentsForPost,
+      isSubmitting: commentsIsSubmitting,
+      isPostDisabled: commentsIsPostDisabled
+    } = useComments();
+    const newCommentForms = ref({});
+    const draftFor = (postId) => {
+      const pid = Number(postId);
+      if (!newCommentForms.value[pid]) {
+        newCommentForms.value[pid] = { author: "", content: "" };
+      }
+      return newCommentForms.value[pid];
+    };
+    const submittingByPost = ref({});
+    const isCommentDisabled = (postId) => {
+      const d = draftFor(postId);
+      const pid = Number(postId);
+      return commentsIsPostDisabled(d.author, d.content) || !!submittingByPost.value[pid];
+    };
+    const expandedComments = ref({});
+    const isCommentsExpanded = (postId) => !!expandedComments.value[postId];
+    const getCommentCount = (postId) => (getCommentsForPost(postId) || []).length;
+    const route = useRoute();
+    const getPageTitle = () => {
+      switch (route.path) {
+        case "/":
+          return "TextsMom - Share Your Unhinged Mom Texts | Funny Mom Messages";
+        case "/post":
+          return "Submit Your Mom Text - Share Funny Mom Messages | TextsMom";
+        case "/contact":
+          return "Contact Us - Get in Touch | TextsMom";
+        case "/about":
+          return "About TextsMom - The Home of Unhinged Mom Texts";
+        default:
+          return "TextsMom - Share Your Unhinged Mom Texts";
+      }
+    };
     useHead({
-      title: `${props.title}`,
+      title: computed(() => getPageTitle()),
+      meta: [
+        {
+          name: "description",
+          content: computed(() => {
+            switch (route.path) {
+              case "/":
+                return "Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world. Join our community of mom text survivors.";
+              case "/post":
+                return "Submit your funny, confusing, or unhinged mom text messages to share with our community. Help others laugh and feel less alone.";
+              case "/contact":
+                return "Get in touch with the TextsMom team. We welcome feedback, suggestions, and your mom text horror stories.";
+              case "/about":
+                return "Learn about TextsMom, the community dedicated to sharing and celebrating the glorious dysfunction of modern motherhood through text messages.";
+              default:
+                return "TextsMom - The home of unhinged mom texts from around the world.";
+            }
+          })
+        },
+        { charset: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { "http-equiv": "X-UA-Compatible", content: "IE=edge" },
+        { name: "theme-color", content: "#FF007A" },
+        { name: "msapplication-TileColor", content: "#FF007A" },
+        { name: "application-name", content: "TextsMom" },
+        { name: "apple-mobile-web-app-title", content: "TextsMom" },
+        { name: "apple-mobile-web-app-capable", content: "yes" },
+        { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+        { name: "mobile-web-app-capable", content: "yes" },
+        { name: "apple-touch-fullscreen", content: "yes" },
+        { name: "format-detection", content: "telephone=no" },
+        { name: "generator", content: "Nuxt.js" }
+      ],
+      link: [
+        { rel: "canonical", href: computed(() => `https://texts.mom${route.path}`) }
+      ],
       script: [
         {
-          innerHTML: `!function(){const e=document.createElement("link").relList;if(!(e&&e.supports&&e.supports("modulepreload"))){for(const e of document.querySelectorAll('link[rel="modulepreload"]'))r(e);new MutationObserver(e=>{for(const o of e)if("childList"===o.type)for(const e of o.addedNodes)"LINK"===e.tagName&&"modulepreload"===e.rel&&r(e)}).observe(document,{childList:!0,subtree:!0})}function r(e){if(e.ep)return;e.ep=!0;const r=function(e){const r={};return e.integrity&&(r.integrity=e.integrity),e.referrerPolicy&&(r.referrerPolicy=e.referrerPolicy),"use-credentials"===e.crossOrigin?r.credentials="include":"anonymous"===e.crossOrigin?r.credentials="omit":r.credentials="same-origin",r}(e);fetch(e.href,r)}}();`
-        }
-      ],
-      style: [
+          type: "application/ld+json",
+          innerHTML: computed(() => {
+            const jsonLdGraph = {
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "WebSite",
+                  "@id": "https://texts.mom/#website",
+                  "url": "https://texts.mom/",
+                  "name": "TextsMom",
+                  "description": "Share and discover the most unhinged, confusing, and hilarious text messages from moms around the world.",
+                  "potentialAction": {
+                    "@type": "SearchAction",
+                    "target": "https://texts.mom/?s={search_term_string}",
+                    "query-input": "required name=search_term_string"
+                  }
+                },
+                {
+                  "@type": "Organization",
+                  "@id": "https://texts.mom/#organization",
+                  "name": "TextsMom",
+                  "url": "https://texts.mom/",
+                  "logo": {
+                    "@type": "ImageObject",
+                    "url": "https://texts.mom/logo.png"
+                  }
+                },
+                {
+                  "@type": "WebPage",
+                  "@id": `https://texts.mom${route.path}#webpage`,
+                  "url": `https://texts.mom${route.path}`,
+                  "name": getPageTitle(),
+                  "isPartOf": {
+                    "@id": "https://texts.mom/#website"
+                  }
+                }
+              ]
+            };
+            return JSON.stringify(jsonLdGraph, null, 2);
+          })
+        },
         {
-          innerHTML: `*,:after,:before{border-color:var(--un-default-border-color,#e5e7eb);border-style:solid;border-width:0;box-sizing:border-box}:after,:before{--un-content:""}html{line-height:1.5;-webkit-text-size-adjust:100%;font-family:ui-sans-serif,system-ui,sans-serif,Apple Color Emoji,Segoe UI Emoji,Segoe UI Symbol,Noto Color Emoji;font-feature-settings:normal;font-variation-settings:normal;-moz-tab-size:4;tab-size:4;-webkit-tap-highlight-color:transparent}body{line-height:inherit;margin:0}h1,h2{font-size:inherit;font-weight:inherit}a{color:inherit;text-decoration:inherit}h1,h2,p,ul{margin:0}ul{list-style:none;padding:0}svg{display:block;vertical-align:middle}*,:after,:before{--un-rotate:0;--un-rotate-x:0;--un-rotate-y:0;--un-rotate-z:0;--un-scale-x:1;--un-scale-y:1;--un-scale-z:1;--un-skew-x:0;--un-skew-y:0;--un-translate-x:0;--un-translate-y:0;--un-translate-z:0;--un-pan-x: ;--un-pan-y: ;--un-pinch-zoom: ;--un-scroll-snap-strictness:proximity;--un-ordinal: ;--un-slashed-zero: ;--un-numeric-figure: ;--un-numeric-spacing: ;--un-numeric-fraction: ;--un-border-spacing-x:0;--un-border-spacing-y:0;--un-ring-offset-shadow:0 0 transparent;--un-ring-shadow:0 0 transparent;--un-shadow-inset: ;--un-shadow:0 0 transparent;--un-ring-inset: ;--un-ring-offset-width:0px;--un-ring-offset-color:#fff;--un-ring-width:0px;--un-ring-color:rgba(147,197,253,.5);--un-blur: ;--un-brightness: ;--un-contrast: ;--un-drop-shadow: ;--un-grayscale: ;--un-hue-rotate: ;--un-invert: ;--un-saturate: ;--un-sepia: ;--un-backdrop-blur: ;--un-backdrop-brightness: ;--un-backdrop-contrast: ;--un-backdrop-grayscale: ;--un-backdrop-hue-rotate: ;--un-backdrop-invert: ;--un-backdrop-opacity: ;--un-backdrop-saturate: ;--un-backdrop-sepia: }`
+          src: "https://www.googletagmanager.com/gtag/js?id=G-F7NW6VS4H4",
+          async: true
+        },
+        {
+          innerHTML: `
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-F7NW6VS4H4');
+      `
         }
       ]
     });
+    const form = ref({
+      name: "",
+      text: "",
+      country: "",
+      state: ""
+    });
+    const contactForm = ref({
+      name: "",
+      email: "",
+      message: "",
+      country: "",
+      state: ""
+    });
+    const { posts } = usePosts();
+    const showSuccessModal = ref(false);
+    const showProfanityModal = ref(false);
+    const showRateLimitModal = ref(false);
+    const showModerationModal = ref(false);
+    const rateLimitRemainingTime = ref(0);
+    const profanityModalType = ref("");
+    const moderationViolationType = ref("");
+    const isVoting = ref(false);
+    const userVotes = ref(/* @__PURE__ */ new Map());
+    const showMobileMenu = ref(false);
+    const closeMobileMenu = () => {
+      showMobileMenu.value = false;
+    };
+    const showShareModal = ref(false);
+    const shareModalMessage = ref("");
+    const showReportModal = ref(false);
+    const showReportSuccessModal = ref(false);
+    ref(null);
+    const showRandomPostModal = ref(false);
+    const currentRandomPost = ref(null);
+    const searchQuery = ref("");
+    const filterOption = ref("all");
+    const filteredPosts = ref([]);
+    watch(posts, (newPosts) => {
+      if (newPosts.length > 0 && filteredPosts.value.length === 0) {
+        filteredPosts.value = [...newPosts];
+      }
+    }, { immediate: true });
+    ref(false);
+    ref(0);
+    const hasUserVoted = (postId, voteType) => {
+      return userVotes.value.get(postId) === voteType;
+    };
+    const currentPage = ref(1);
+    const postsToDisplay = computed(() => {
+      return filteredPosts.value.length > 0 || searchQuery.value || filterOption.value !== "all" ? filteredPosts.value : posts.value;
+    });
+    const totalPages = computed(() => {
+      return Math.ceil(postsToDisplay.value.length / postsPerPage);
+    });
+    const paginatedPosts = computed(() => {
+      const start = (currentPage.value - 1) * postsPerPage;
+      const end = start + postsPerPage;
+      return postsToDisplay.value.slice(start, end);
+    });
+    const countries = [
+      "United States",
+      "Canada",
+      "United Kingdom",
+      "Australia",
+      "Germany",
+      "France",
+      "Italy",
+      "Spain",
+      "Netherlands",
+      "Sweden",
+      "Norway",
+      "Denmark",
+      "Japan",
+      "South Korea",
+      "India",
+      "Brazil",
+      "Mexico",
+      "Argentina",
+      "Other"
+    ];
+    const usStates = [
+      "Alabama",
+      "Alaska",
+      "Arizona",
+      "Arkansas",
+      "California",
+      "Colorado",
+      "Connecticut",
+      "Delaware",
+      "Florida",
+      "Georgia",
+      "Hawaii",
+      "Idaho",
+      "Illinois",
+      "Indiana",
+      "Iowa",
+      "Kansas",
+      "Kentucky",
+      "Louisiana",
+      "Maine",
+      "Maryland",
+      "Massachusetts",
+      "Michigan",
+      "Minnesota",
+      "Mississippi",
+      "Missouri",
+      "Montana",
+      "Nebraska",
+      "Nevada",
+      "New Hampshire",
+      "New Jersey",
+      "New Mexico",
+      "New York",
+      "North Carolina",
+      "North Dakota",
+      "Ohio",
+      "Oklahoma",
+      "Oregon",
+      "Pennsylvania",
+      "Rhode Island",
+      "South Carolina",
+      "South Dakota",
+      "Tennessee",
+      "Texas",
+      "Utah",
+      "Vermont",
+      "Virginia",
+      "Washington",
+      "West Virginia",
+      "Wisconsin",
+      "Wyoming"
+    ];
+    const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }).format(date);
+    };
+    const currentPost = ref(null);
+    const getNextPostId = () => {
+      if (!currentPost.value || posts.value.length === 0) return null;
+      const currentIndex = posts.value.findIndex((post) => post.id === currentPost.value.id);
+      if (currentIndex === -1 || currentIndex === posts.value.length - 1) {
+        return null;
+      }
+      return posts.value[currentIndex + 1].id;
+    };
+    const hasNextPost = computed(() => {
+      return getNextPostId() !== null;
+    });
+    const setCurrentPostFromRoute = () => {
+      const route2 = useRoute();
+      if (route2.path.startsWith("/post/")) {
+        const identifier = route2.path.split("/")[2];
+        if (identifier) {
+          let foundPost = posts.value.find((post) => post.slug === identifier);
+          if (!foundPost && !isNaN(identifier)) {
+            const postId = parseInt(identifier);
+            foundPost = posts.value.find((post) => post.id === postId);
+          }
+          if (foundPost) {
+            currentPost.value = foundPost;
+          } else {
+            loadIndividualPost(identifier);
+          }
+        }
+      } else {
+        currentPost.value = null;
+      }
+    };
+    const loadIndividualPost = async (identifier) => {
+      try {
+        let existingPost = posts.value.find((post) => post.slug === identifier);
+        if (!existingPost && !isNaN(identifier)) {
+          const postId = parseInt(identifier);
+          existingPost = posts.value.find((post) => post.id === postId);
+        }
+        if (existingPost) {
+          currentPost.value = existingPost;
+          return;
+        }
+        let query = supabase.from("posts").select("*");
+        if (isNaN(identifier)) {
+          query = query.eq("slug", identifier);
+        } else {
+          const postId = parseInt(identifier);
+          query = query.or(`slug.eq.${identifier},id.eq.${postId}`);
+        }
+        const { data, error } = await query.single();
+        if (error) {
+          console.error("Error loading individual post:", error);
+          currentPost.value = null;
+          return;
+        }
+        if (data) {
+          currentPost.value = data;
+          return;
+        }
+        currentPost.value = null;
+      } catch (error) {
+        console.error("Error loading individual post:", error);
+        currentPost.value = null;
+      }
+    };
+    const { data: ssrPost } = ([__temp, __restore] = withAsyncContext(async () => useAsyncData(
+      "current-post",
+      async () => {
+        if (route.path.startsWith("/post/")) {
+          const identifier = route.path.split("/")[2];
+          if (identifier) {
+            try {
+              let query = supabase.from("posts").select("*");
+              if (isNaN(identifier)) {
+                query = query.eq("slug", identifier);
+              } else {
+                const postId = parseInt(identifier);
+                query = query.or(`slug.eq.${identifier},id.eq.${postId}`);
+              }
+              const { data, error } = await query.single();
+              if (error || !data) {
+                return null;
+              }
+              return data;
+            } catch (error) {
+              console.error("Error loading post for SSR:", error);
+              return null;
+            }
+          }
+        }
+        return null;
+      },
+      {
+        server: true,
+        default: () => null
+      }
+    )), __temp = await __temp, __restore(), __temp);
+    if (ssrPost.value) {
+      currentPost.value = ssrPost.value;
+      const ssrBlogPostingLd = {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "@id": `https://texts.mom/post/${ssrPost.value.slug || ssrPost.value.id}#blogposting`,
+        "headline": ssrPost.value.seoTitle || (ssrPost.value.message ? ssrPost.value.message.substring(0, 60).trim() + (ssrPost.value.message.length > 60 ? "..." : "") : "Mom Text"),
+        "description": ssrPost.value.seoDescription || (ssrPost.value.message ? ssrPost.value.message.substring(0, 155).trim() + (ssrPost.value.message.length > 155 ? "..." : "") : "A hilarious mom text submitted to texts.mom."),
+        "articleBody": ssrPost.value.message || "A hilarious mom text.",
+        "url": `https://texts.mom/post/${ssrPost.value.slug || ssrPost.value.id}`,
+        "datePublished": ssrPost.value.created_at ? new Date(ssrPost.value.created_at).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
+        "dateModified": ssrPost.value.updated_at ? new Date(ssrPost.value.updated_at).toISOString() : ssrPost.value.created_at ? new Date(ssrPost.value.created_at).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
+        "image": {
+          "@type": "ImageObject",
+          "url": ssrPost.value.image || "https://texts.mom/default-post-image.jpg"
+        },
+        "author": {
+          "@type": "Person",
+          "name": ssrPost.value.name || "Anonymous",
+          "url": ssrPost.value.authorUrl || "https://texts.mom/about"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "TextsMom",
+          "@id": "https://texts.mom/#organization",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://texts.mom/logo.png"
+          }
+        },
+        "mainEntityOfPage": {
+          "@type": "WebPage",
+          "@id": `https://texts.mom/post/${ssrPost.value.slug || ssrPost.value.id}#webpage`
+        },
+        "isPartOf": {
+          "@type": "Blog",
+          "@id": "https://texts.mom/#blog",
+          "name": "TextsMom"
+        }
+      };
+      useHead({
+        script: [
+          {
+            key: "ssr-blogposting-ld",
+            type: "application/ld+json",
+            innerHTML: JSON.stringify(ssrBlogPostingLd, null, 2)
+          }
+        ]
+      });
+    }
+    watch(() => useRoute().path, () => {
+      setCurrentPostFromRoute();
+    }, { immediate: true });
+    watch(currentPost, (newPost) => {
+      if (newPost) {
+        const blogPostingLd = {
+          "@context": "https://schema.org",
+          "@type": "BlogPosting",
+          "@id": `https://texts.mom/post/${newPost.slug || newPost.id}#blogposting`,
+          "headline": newPost.seoTitle || (newPost.message ? newPost.message.substring(0, 60).trim() + (newPost.message.length > 60 ? "..." : "") : "Mom Text"),
+          "description": newPost.seoDescription || (newPost.message ? newPost.message.substring(0, 155).trim() + (newPost.message.length > 155 ? "..." : "") : "A hilarious mom text submitted to texts.mom."),
+          "articleBody": newPost.message || "A hilarious mom text.",
+          "url": `https://texts.mom/post/${newPost.slug || newPost.id}`,
+          "datePublished": newPost.created_at ? new Date(newPost.created_at).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
+          "dateModified": newPost.updated_at ? new Date(newPost.updated_at).toISOString() : newPost.created_at ? new Date(newPost.created_at).toISOString() : (/* @__PURE__ */ new Date()).toISOString(),
+          "image": {
+            "@type": "ImageObject",
+            "url": newPost.image || "https://texts.mom/default-post-image.jpg"
+          },
+          "author": {
+            "@type": "Person",
+            "name": newPost.name || "Anonymous",
+            "url": newPost.authorUrl || "https://texts.mom/about"
+          },
+          "publisher": {
+            "@type": "Organization",
+            "name": "TextsMom",
+            "@id": "https://texts.mom/#organization",
+            "logo": {
+              "@type": "ImageObject",
+              "url": "https://texts.mom/logo.png"
+            }
+          },
+          "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": `https://texts.mom/post/${newPost.slug || newPost.id}#webpage`
+          },
+          "isPartOf": {
+            "@type": "Blog",
+            "@id": "https://texts.mom/#blog",
+            "name": "TextsMom"
+          }
+        };
+        useHead({
+          title: `${newPost.name}'s Mom Text - TextsMom`,
+          meta: [
+            {
+              name: "description",
+              content: `Read this hilarious mom text from ${newPost.name}: "${newPost.message.substring(0, 150)}${newPost.message.length > 150 ? "..." : ""}"`
+            },
+            {
+              property: "og:title",
+              content: `${newPost.name}'s Mom Text - TextsMom`
+            },
+            {
+              property: "og:description",
+              content: `"${newPost.message.substring(0, 200)}${newPost.message.length > 200 ? "..." : ""}"`
+            },
+            {
+              property: "og:url",
+              content: `https://texts.mom/post/${newPost.slug || newPost.id}`
+            }
+          ],
+          script: [
+            {
+              key: "blogposting-ld",
+              type: "application/ld+json",
+              innerHTML: JSON.stringify(blogPostingLd, null, 2)
+            }
+          ]
+        });
+      }
+    });
     return (_ctx, _push, _parent, _attrs) => {
-      _push(`<div${ssrRenderAttrs(mergeProps({ class: "antialiased bg-white dark:bg-[#020420] dark:text-white flex flex-col items-center justify-center min-h-screen place-content-center sm:text-base text-[#020420] text-sm" }, _attrs))} data-v-7c414115><div class="flex flex-col mt-6 sm:mt-0" data-v-7c414115><h1 class="flex flex-col gap-y-4 items-center justify-center" data-v-7c414115><a href="https://nuxt.com?utm_source=nuxt-welcome" target="_blank" class="gap-4 inline-flex items-end" data-v-7c414115><svg xmlns="http://www.w3.org/2000/svg" fill="none" aria-label="Nuxt" class="h-8 sm:h-12" viewBox="0 0 800 200" data-v-7c414115><path fill="#00dc82" d="M168.303 200h111.522c3.543 0 7.022-.924 10.09-2.679A20.1 20.1 0 0 0 297.3 190a19.86 19.86 0 0 0 2.7-10.001 19.86 19.86 0 0 0-2.709-9.998L222.396 41.429a20.1 20.1 0 0 0-7.384-7.32 20.3 20.3 0 0 0-10.088-2.679c-3.541 0-7.02.925-10.087 2.68a20.1 20.1 0 0 0-7.384 7.32l-19.15 32.896L130.86 9.998a20.1 20.1 0 0 0-7.387-7.32A20.3 20.3 0 0 0 113.384 0c-3.542 0-7.022.924-10.09 2.679a20.1 20.1 0 0 0-7.387 7.319L2.709 170A19.85 19.85 0 0 0 0 179.999c-.002 3.511.93 6.96 2.7 10.001a20.1 20.1 0 0 0 7.385 7.321A20.3 20.3 0 0 0 20.175 200h70.004c27.737 0 48.192-12.075 62.266-35.633l34.171-58.652 18.303-31.389 54.93 94.285h-73.233zm-79.265-31.421-48.854-.011 73.232-125.706 36.541 62.853-24.466 42.01c-9.347 15.285-19.965 20.854-36.453 20.854" data-v-7c414115></path><path fill="currentColor" d="M377 200a4 4 0 0 0 4-4v-93s5.244 8.286 15 25l38.707 66.961c1.789 3.119 5.084 5.039 8.649 5.039H470V50h-27a4 4 0 0 0-4 4v94l-17-30-36.588-62.98c-1.792-3.108-5.081-5.02-8.639-5.02H350v150zm299.203-56.143L710.551 92h-25.73a9.97 9.97 0 0 0-8.333 4.522L660.757 120.5l-15.731-23.978A9.97 9.97 0 0 0 636.693 92h-25.527l34.348 51.643L608.524 200h24.966a9.97 9.97 0 0 0 8.29-4.458l19.18-28.756 18.981 28.72a9.97 9.97 0 0 0 8.313 4.494h24.736zM724.598 92h19.714V60.071h28.251V92H800v24.857h-27.437V159.5c0 10.5 5.284 15.429 14.43 15.429H800V200h-16.869c-23.576 0-38.819-14.143-38.819-39.214v-43.929h-19.714zM590 92h-15c-3.489 0-6.218.145-8.5 2.523-2.282 2.246-2.5 3.63-2.5 7.066v52.486c0 8.058-.376 12.962-4 16.925-3.624 3.831-8.619 5-16 5-7.247 0-12.376-1.169-16-5-3.624-3.963-4-8.867-4-16.925v-52.486c0-3.435-.218-4.82-2.5-7.066C519.218 92.145 516.489 92 513 92h-15v62.422q0 21.006 11.676 33.292C517.594 195.905 529.103 200 544 200s26.204-4.095 34.123-12.286Q590 175.428 590 154.422z" data-v-7c414115></path></svg> <span class="bg-[#00DC42]/10 border border-[#00DC42]/50 font-mono font-semibold group-hover:bg-[#00DC42]/15 group-hover:border-[#00DC42] inline-block leading-none px-2 py-1 rounded sm:px-2.5 sm:py-1.5 sm:text-[14px] text-[#00DC82] text-[12px]" data-v-7c414115>4.0.1</span></a></h1><div class="gap-4 grid grid-cols-1 max-w-[980px] mt-6 px-4 sm:gap-6 sm:grid-cols-3 sm:mt-10 w-full" data-v-7c414115><div class="bg-gray-50/10 border border-[#00DC42]/50 dark:bg-white/5 flex flex-col gap-1 p-6 rounded-lg sm:col-span-2" data-v-7c414115><div class="bg-[#00DC82]/5 border border-[#00DC82] dark:bg-[#020420] dark:border-[#00DC82]/80 dark:text-[#00DC82] flex h-[32px] items-center justify-center rounded text-[#00DC82] w-[32px]" data-v-7c414115><svg xmlns="http://www.w3.org/2000/svg" class="size-[18px]" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="m228.1 121.2-143.9-88A8 8 0 0 0 72 40v176a8 8 0 0 0 12.2 6.8l143.9-88a7.9 7.9 0 0 0 0-13.6" opacity=".2" data-v-7c414115></path><path fill="currentColor" d="M80 232a15.5 15.5 0 0 1-7.8-2.1A15.8 15.8 0 0 1 64 216V40a15.8 15.8 0 0 1 8.2-13.9 15.5 15.5 0 0 1 16.1.3l144 87.9a16 16 0 0 1 0 27.4l-144 87.9A15.4 15.4 0 0 1 80 232m0-192v176l144-88Z" data-v-7c414115></path></svg></div><h2 class="font-semibold mt-1 text-base" data-v-7c414115>Get started</h2><p class="dark:text-gray-200 text-gray-700 text-sm" data-v-7c414115>Remove this welcome page by replacing <a class="bg-green-50 border border-green-600/10 dark:bg-[#020420] dark:border-white/10 dark:text-[#00DC82] font-bold font-mono p-1 rounded text-green-700" data-v-7c414115>&lt;NuxtWelcome/&gt;</a> in <a href="https://nuxt.com/docs/guide/directory-structure/app" target="_blank" rel="noopener" class="bg-green-50 border border-green-600/20 dark:bg-[#020420] dark:border-white/20 dark:text-[#00DC82] font-bold font-mono hover:border-[#00DC82] p-1 rounded text-green-700" data-v-7c414115>app.vue</a> with your own code.</p></div><a href="https://nuxt.com/docs?utm_source=nuxt-welcome" target="_blank" class="bg-gray-50/10 border border-gray-200 dark:bg-white/5 dark:border-white/10 flex flex-col gap-1 group hover:border-[#00DC82] hover:dark:border-[#00DC82] p-6 relative rounded-lg transition-all" data-v-7c414115><div class="bg-[#00DC82]/5 border border-[#00DC82] dark:bg-[#020420] dark:border-[#00DC82]/50 dark:text-[#00DC82] flex group-hover:dark:border-[#00DC82]/80 h-[32px] items-center justify-center rounded text-[#00DC82] transition-all w-[32px]" data-v-7c414115><svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M136 48v128H88V80H40V48a8 8 0 0 1 8-8h32a8 8 0 0 1 8 8 8 8 0 0 1 8-8h32a8 8 0 0 1 8 8m89.9 149.6-8.3-30.9-46.4 12.5 8.3 30.9a8 8 0 0 0 9.8 5.6l30.9-8.3a8 8 0 0 0 5.7-9.8M184.5 43.1a8.1 8.1 0 0 0-9.8-5.7l-30.9 8.3a8.1 8.1 0 0 0-5.7 9.8l8.3 30.9L192.8 74Z" opacity=".2" data-v-7c414115></path><path fill="currentColor" d="M233.6 195.6 192.2 41a16 16 0 0 0-19.6-11.3L141.7 38l-1 .3A16 16 0 0 0 128 32H96a15.8 15.8 0 0 0-8 2.2 15.8 15.8 0 0 0-8-2.2H48a16 16 0 0 0-16 16v160a16 16 0 0 0 16 16h32a15.8 15.8 0 0 0 8-2.2 15.8 15.8 0 0 0 8 2.2h32a16 16 0 0 0 16-16v-99.6l27.8 103.7a16 16 0 0 0 15.5 11.9 20 20 0 0 0 4.1-.5l30.9-8.3a16 16 0 0 0 11.3-19.6M156.2 92.1l30.9-8.3 20.7 77.3-30.9 8.3Zm20.5-46.9 6.3 23.1-30.9 8.3-6.3-23.1ZM128 48v120H96V48Zm-48 0v24H48V48ZM48 208V88h32v120Zm80 0H96v-24h32zm90.2-8.3-30.9 8.3-6.3-23.2 31-8.3z" data-v-7c414115></path></svg></div> <svg xmlns="http://www.w3.org/2000/svg" class="absolute dark:text-white/40 group-hover:size-5 group-hover:text-[#00DC82] right-4 size-4 text-[#020420]/20 top-4 transition-all" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M200 64v104a8 8 0 0 1-16 0V83.3L69.7 197.7a8.2 8.2 0 0 1-11.4 0 8.1 8.1 0 0 1 0-11.4L172.7 72H88a8 8 0 0 1 0-16h104a8 8 0 0 1 8 8" data-v-7c414115></path></svg> <h2 class="font-semibold mt-1 text-base" data-v-7c414115>Documentation</h2> <p class="dark:text-gray-200 group-hover:dark:text-gray-100 text-gray-700 text-sm" data-v-7c414115>We highly recommend you take a look at the Nuxt documentation to level up.</p></a></div><div class="gap-4 grid grid-cols-1 max-w-[980px] mt-4 px-4 sm:gap-6 sm:grid-cols-3 sm:mt-6 w-full" data-v-7c414115><a href="https://nuxt.com/modules?utm_source=nuxt-welcome" target="_blank" class="bg-gray-50/10 border border-gray-200 dark:bg-white/5 dark:border-white/10 flex flex-col gap-1 group hover:border-[#00DC82] hover:dark:border-[#00DC82] p-6 relative rounded-lg transition-all" data-v-7c414115><div class="bg-[#00DC82]/5 border border-[#00DC82] dark:bg-[#020420] dark:border-[#00DC82]/50 dark:text-[#00DC82] flex group-hover:dark:border-[#00DC82]/80 h-[32px] items-center justify-center rounded text-[#00DC82] transition-all w-[32px]" data-v-7c414115><svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M64 216a8 8 0 0 1-8-8v-42.7a27.6 27.6 0 0 1-14.1 2.6A28 28 0 1 1 56 114.7V72a8 8 0 0 1 8-8h46.7a27.6 27.6 0 0 1-2.6-14.1A28 28 0 1 1 161.3 64H208a8 8 0 0 1 8 8v42.7a27.6 27.6 0 0 0-14.1-2.6 28 28 0 1 0 14.1 53.2V208a8 8 0 0 1-8 8Z" opacity=".2" data-v-7c414115></path><path fill="currentColor" d="M220.3 158.5a8.1 8.1 0 0 0-7.7-.4 20.2 20.2 0 0 1-23.2-4.4 20 20 0 0 1 13.1-33.6 19.6 19.6 0 0 1 10.1 1.8 8.1 8.1 0 0 0 7.7-.4 8.2 8.2 0 0 0 3.7-6.8V72a16 16 0 0 0-16-16h-36.2c.1-1.3.2-2.7.2-4a36.1 36.1 0 0 0-38.3-35.9 36 36 0 0 0-33.6 33.3 36.4 36.4 0 0 0 .1 6.6H64a16 16 0 0 0-16 16v32.2l-4-.2a35.6 35.6 0 0 0-26.2 11.4 35.3 35.3 0 0 0-9.7 26.9 36 36 0 0 0 33.3 33.6 36.4 36.4 0 0 0 6.6-.1V208a16 16 0 0 0 16 16h144a16 16 0 0 0 16-16v-42.7a8.2 8.2 0 0 0-3.7-6.8M208 208H64v-42.7a8.2 8.2 0 0 0-3.7-6.8 8.1 8.1 0 0 0-7.7-.4 19.6 19.6 0 0 1-10.1 1.8 20 20 0 0 1-13.1-33.6 20.2 20.2 0 0 1 23.2-4.4 8.1 8.1 0 0 0 7.7-.4 8.2 8.2 0 0 0 3.7-6.8V72h46.7a8.2 8.2 0 0 0 6.8-3.7 8.1 8.1 0 0 0 .4-7.7 19.6 19.6 0 0 1-1.8-10.1 20 20 0 0 1 33.6-13.1 20.2 20.2 0 0 1 4.4 23.2 8.1 8.1 0 0 0 .4 7.7 8.2 8.2 0 0 0 6.8 3.7H208v32.2a36.4 36.4 0 0 0-6.6-.1 36 36 0 0 0-33.3 33.6A36.1 36.1 0 0 0 204 176l4-.2Z" data-v-7c414115></path></svg></div> <svg xmlns="http://www.w3.org/2000/svg" class="absolute dark:text-white/40 group-hover:size-5 group-hover:text-[#00DC82] right-4 size-4 text-[#020420]/20 top-4 transition-all" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M200 64v104a8 8 0 0 1-16 0V83.3L69.7 197.7a8.2 8.2 0 0 1-11.4 0 8.1 8.1 0 0 1 0-11.4L172.7 72H88a8 8 0 0 1 0-16h104a8 8 0 0 1 8 8" data-v-7c414115></path></svg> <h2 class="font-semibold mt-1 text-base" data-v-7c414115>Modules</h2> <p class="dark:text-gray-200 group-hover:dark:text-gray-100 text-gray-700 text-sm" data-v-7c414115>Discover our list of modules to supercharge your Nuxt project.</p></a> <a href="https://nuxt.com/docs/examples?utm_source=nuxt-welcome" target="_blank" class="bg-gray-50/10 border border-gray-200 dark:bg-white/5 dark:border-white/10 flex flex-col gap-1 group hover:border-[#00DC82] hover:dark:border-[#00DC82] p-6 relative rounded-lg transition-all" data-v-7c414115><div class="bg-[#00DC82]/5 border border-[#00DC82] dark:bg-[#020420] dark:border-[#00DC82]/50 dark:text-[#00DC82] flex group-hover:dark:border-[#00DC82]/80 h-[32px] items-center justify-center rounded text-[#00DC82] transition-all w-[32px]" data-v-7c414115><svg xmlns="http://www.w3.org/2000/svg" class="size-5" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M224 56v144a8 8 0 0 1-8 8H40a8 8 0 0 1-8-8V56a8 8 0 0 1 8-8h176a8 8 0 0 1 8 8" opacity=".2" data-v-7c414115></path><path fill="currentColor" d="M216 40H40a16 16 0 0 0-16 16v144a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V56a16 16 0 0 0-16-16m0 160H40V56h176zM80 84a12 12 0 1 1-12-12 12 12 0 0 1 12 12m40 0a12 12 0 1 1-12-12 12 12 0 0 1 12 12" data-v-7c414115></path></svg></div> <svg xmlns="http://www.w3.org/2000/svg" class="absolute dark:text-white/40 group-hover:size-5 group-hover:text-[#00DC82] right-4 size-4 text-[#020420]/20 top-4 transition-all" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M200 64v104a8 8 0 0 1-16 0V83.3L69.7 197.7a8.2 8.2 0 0 1-11.4 0 8.1 8.1 0 0 1 0-11.4L172.7 72H88a8 8 0 0 1 0-16h104a8 8 0 0 1 8 8" data-v-7c414115></path></svg> <h2 class="font-semibold mt-1 text-base" data-v-7c414115>Examples</h2> <p class="dark:text-gray-200 group-hover:dark:text-gray-100 text-gray-700 text-sm" data-v-7c414115>Explore different way of using Nuxt features and get inspired.</p></a> <a href="https://nuxt.com/deploy?utm_source=nuxt-welcome" target="_blank" class="bg-gray-50/10 border border-gray-200 dark:bg-white/5 dark:border-white/10 flex flex-col gap-1 group hover:border-[#00DC82] hover:dark:border-[#00DC82] p-6 relative rounded-lg transition-all" data-v-7c414115><div class="bg-[#00DC82]/5 border border-[#00DC82] dark:bg-[#020420] dark:border-[#00DC82]/50 dark:text-[#00DC82] flex group-hover:dark:border-[#00DC82]/80 h-[32px] items-center justify-center rounded text-[#00DC82] transition-all w-[32px]" data-v-7c414115><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M94.1 184.6c-11.4 33.9-56.6 33.9-56.6 33.9s0-45.2 33.9-56.6Zm90.5-67.9v64.6a8 8 0 0 1-2.4 5.6l-32.3 32.4a8 8 0 0 1-13.5-4.1l-8.4-41.9Zm-45.3-45.3H74.7a8 8 0 0 0-5.6 2.4l-32.4 32.3a8 8 0 0 0 4.1 13.5l41.9 8.4Z" opacity=".2" data-v-7c414115></path><path fill="currentColor" d="M96.6 177a7.9 7.9 0 0 0-10.1 5c-6.6 19.7-27.9 25.8-40.2 27.7 1.9-12.3 8-33.6 27.7-40.2a8 8 0 1 0-5.1-15.1c-16.4 5.4-28.4 18.4-34.8 37.5a91.8 91.8 0 0 0-4.6 26.6 8 8 0 0 0 8 8 91.8 91.8 0 0 0 26.6-4.6c19.1-6.4 32.1-18.4 37.5-34.8a7.9 7.9 0 0 0-5-10.1" data-v-7c414115></path><path fill="currentColor" d="M227.6 41.8a15.7 15.7 0 0 0-13.4-13.4c-11.3-1.7-40.6-2.5-69.2 26.1l-9 8.9H74.7a16.2 16.2 0 0 0-11.3 4.7l-32.3 32.4a15.9 15.9 0 0 0-4 15.9 16 16 0 0 0 12.2 11.1l39.5 7.9 41.8 41.8 7.9 39.5a16 16 0 0 0 11.1 12.2 14.7 14.7 0 0 0 4.6.7 15.6 15.6 0 0 0 11.3-4.7l32.4-32.3a16.2 16.2 0 0 0 4.7-11.3V120l8.9-9c28.6-28.6 27.8-57.9 26.1-69.2M74.7 79.4H120l-39.9 39.9-37.7-7.5Zm81.6-13.6c7.8-7.8 28.8-25.6 55.5-21.6 4 26.7-13.8 47.7-21.6 55.5L128 161.9 94.1 128Zm20.3 115.5-32.4 32.3-7.5-37.7 39.9-39.9Z" data-v-7c414115></path></svg></div> <svg xmlns="http://www.w3.org/2000/svg" class="absolute dark:text-white/40 group-hover:size-5 group-hover:text-[#00DC82] right-4 size-4 text-[#020420]/20 top-4 transition-all" viewBox="0 0 256 256" data-v-7c414115><path fill="currentColor" d="M200 64v104a8 8 0 0 1-16 0V83.3L69.7 197.7a8.2 8.2 0 0 1-11.4 0 8.1 8.1 0 0 1 0-11.4L172.7 72H88a8 8 0 0 1 0-16h104a8 8 0 0 1 8 8" data-v-7c414115></path></svg> <h2 class="font-semibold mt-1 text-base" data-v-7c414115>Deploy</h2> <p class="dark:text-gray-200 group-hover:dark:text-gray-100 text-gray-700 text-sm" data-v-7c414115>Learn how to deploy your Nuxt project on different providers.</p></a></div><footer class="lg:px-8 mb-6 mt-6 mx-auto px-4 sm:mb-0 sm:mt-10 sm:px-6 w-full" data-v-7c414115><ul class="flex gap-4 items-center justify-center" data-v-7c414115><li data-v-7c414115><a href="https://go.nuxt.com/github" target="_blank" class="dark:hover:text-white dark:text-gray-400 focus-visible:ring-2 hover:text-[#020420] text-gray-500" data-v-7c414115><span class="sr-only" data-v-7c414115>Nuxt GitHub Repository</span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" data-v-7c414115><path fill="currentColor" d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" data-v-7c414115></path></svg></a></li><li data-v-7c414115><a href="https://go.nuxt.com/discord" target="_blank" class="dark:hover:text-white dark:text-gray-400 focus-visible:ring-2 hover:text-[#020420] text-gray-500" data-v-7c414115><span class="sr-only" data-v-7c414115>Nuxt Discord Server</span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" data-v-7c414115><path fill="currentColor" d="M20.317 4.37a19.8 19.8 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.3 18.3 0 0 0-5.487 0 13 13 0 0 0-.617-1.25.08.08 0 0 0-.079-.037A19.7 19.7 0 0 0 3.677 4.37a.1.1 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.08.08 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.08.08 0 0 0 .084-.028 14 14 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13 13 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10 10 0 0 0 .372-.292.07.07 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.07.07 0 0 1 .078.01q.181.149.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.08.08 0 0 0 .084.028 19.8 19.8 0 0 0 6.002-3.03.08.08 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.06.06 0 0 0-.031-.03M8.02 15.33c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418m7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418" data-v-7c414115></path></svg></a></li><li data-v-7c414115><a href="https://go.nuxt.com/x" target="_blank" class="dark:hover:text-white dark:text-gray-400 focus-visible:ring-2 hover:text-[#020420] text-gray-500" data-v-7c414115><span class="sr-only" data-v-7c414115>Nuxt on X</span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" data-v-7c414115><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z" data-v-7c414115></path></svg></a></li><li data-v-7c414115><a href="https://go.nuxt.com/bluesky" target="_blank" class="dark:hover:text-white dark:text-gray-400 focus-visible:ring-2 hover:text-[#020420] text-gray-500" data-v-7c414115><span class="sr-only" data-v-7c414115>Nuxt Bluesky</span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" data-v-7c414115><path fill="currentColor" d="M12 10.8c-1.087-2.114-4.046-6.053-6.798-7.995C2.566.944 1.561 1.266.902 1.565.139 1.908 0 3.08 0 3.768c0 .69.378 5.65.624 6.479.815 2.736 3.713 3.66 6.383 3.364q.204-.03.415-.056-.207.033-.415.056c-3.912.58-7.387 2.005-2.83 7.078 5.013 5.19 6.87-1.113 7.823-4.308.953 3.195 2.05 9.271 7.733 4.308 4.267-4.308 1.172-6.498-2.74-7.078a9 9 0 0 1-.415-.056q.21.026.415.056c2.67.297 5.568-.628 6.383-3.364.246-.828.624-5.79.624-6.478 0-.69-.139-1.861-.902-2.206-.659-.298-1.664-.62-4.3 1.24C16.046 4.748 13.087 8.687 12 10.8" data-v-7c414115></path></svg></a></li><li data-v-7c414115><a href="https://go.nuxt.com/linkedin" target="_blank" class="dark:hover:text-white dark:text-gray-400 focus-visible:ring-2 hover:text-[#020420] text-gray-500" data-v-7c414115><span class="sr-only" data-v-7c414115>Nuxt Linkedin</span> <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" data-v-7c414115><path fill="currentColor" d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.06 2.06 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065m1.782 13.019H3.555V9h3.564zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0z" data-v-7c414115></path></svg></a></li></ul></footer></div></div>`);
+      const _component_NuxtRouteAnnouncer = __nuxt_component_0$1;
+      const _component_NuxtLink = __nuxt_component_0;
+      _push(`<div${ssrRenderAttrs(mergeProps({ class: "site-container" }, _attrs))}>`);
+      _push(ssrRenderComponent(_component_NuxtRouteAnnouncer, null, null, _parent));
+      _push(`<header class="site-header">`);
+      _push(ssrRenderComponent(_component_NuxtLink, {
+        to: "/",
+        class: "site-name-link"
+      }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`<div class="site-name"${_scopeId}><span class="texts"${_scopeId}>texts</span><span class="dot"${_scopeId}>.</span><span class="mom"${_scopeId}>mom</span></div>`);
+          } else {
+            return [
+              createVNode("div", { class: "site-name" }, [
+                createVNode("span", { class: "texts" }, "texts"),
+                createVNode("span", { class: "dot" }, "."),
+                createVNode("span", { class: "mom" }, "mom")
+              ])
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(`<nav class="site-nav desktop-nav"><button class="nav-link nav-link-texts">THE TEXTS</button>`);
+      _push(ssrRenderComponent(_component_NuxtLink, {
+        to: "/post",
+        class: "nav-link nav-link-post"
+      }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`POST!`);
+          } else {
+            return [
+              createTextVNode("POST!")
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(ssrRenderComponent(_component_NuxtLink, {
+        to: "/about",
+        class: "nav-link"
+      }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`ABOUT`);
+          } else {
+            return [
+              createTextVNode("ABOUT")
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(ssrRenderComponent(_component_NuxtLink, {
+        to: "/contact",
+        class: "nav-link"
+      }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`CONTACT`);
+          } else {
+            return [
+              createTextVNode("CONTACT")
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(`</nav><div class="mobile-nav"><button class="${ssrRenderClass([{ "active": unref(showMobileMenu) }, "hamburger-btn"])}"><span></span><span></span><span></span></button><div class="${ssrRenderClass([{ "active": unref(showMobileMenu) }, "mobile-backdrop"])}"></div><nav class="${ssrRenderClass([{ "active": unref(showMobileMenu) }, "mobile-menu"])}"><button class="mobile-nav-link mobile-nav-link-texts">THE TEXTS</button>`);
+      _push(ssrRenderComponent(_component_NuxtLink, {
+        to: "/post",
+        class: "mobile-nav-link mobile-nav-link-post",
+        onClick: closeMobileMenu
+      }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`POST!`);
+          } else {
+            return [
+              createTextVNode("POST!")
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(ssrRenderComponent(_component_NuxtLink, {
+        to: "/about",
+        class: "mobile-nav-link",
+        onClick: closeMobileMenu
+      }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`ABOUT`);
+          } else {
+            return [
+              createTextVNode("ABOUT")
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(ssrRenderComponent(_component_NuxtLink, {
+        to: "/contact",
+        class: "mobile-nav-link",
+        onClick: closeMobileMenu
+      }, {
+        default: withCtx((_, _push2, _parent2, _scopeId) => {
+          if (_push2) {
+            _push2(`CONTACT`);
+          } else {
+            return [
+              createTextVNode("CONTACT")
+            ];
+          }
+        }),
+        _: 1
+      }, _parent));
+      _push(`</nav></div></header>`);
+      if (_ctx.$route.path === "/post") {
+        _push(`<main><hr class="site-hr"><div class="post-form-container"><h1 class="post-title">DROP THE TEXT<span class="green-period">.</span> CLEANSE YOUR SOUL<span class="green-period">.</span></h1><form class="post-form"><div class="form-group"><label for="name" class="form-label">NAME</label><input type="text" id="name"${ssrRenderAttr("value", unref(form).name)} class="form-input" placeholder="Your name, not your mom&#39;s..." required></div><div class="form-group"><label for="text" class="form-label">TEXT</label><textarea id="text" class="form-textarea" rows="6" maxlength="280" placeholder="Share the mom text that made you laugh, cry, or question reality..." required>${ssrInterpolate(unref(form).text)}</textarea></div><div class="form-group"><label for="country" class="form-label">COUNTRY</label><select id="country" class="form-select" required><option value="" disabled${ssrIncludeBooleanAttr(Array.isArray(unref(form).country) ? ssrLooseContain(unref(form).country, "") : ssrLooseEqual(unref(form).country, "")) ? " selected" : ""}>Select a country</option><!--[-->`);
+        ssrRenderList(countries, (country) => {
+          _push(`<option${ssrRenderAttr("value", country)}${ssrIncludeBooleanAttr(Array.isArray(unref(form).country) ? ssrLooseContain(unref(form).country, country) : ssrLooseEqual(unref(form).country, country)) ? " selected" : ""}>${ssrInterpolate(country)}</option>`);
+        });
+        _push(`<!--]--></select></div>`);
+        if (unref(form).country === "United States") {
+          _push(`<div class="form-group"><label for="state" class="form-label">STATE</label><select id="state" class="form-select" required><option value="" disabled${ssrIncludeBooleanAttr(Array.isArray(unref(form).state) ? ssrLooseContain(unref(form).state, "") : ssrLooseEqual(unref(form).state, "")) ? " selected" : ""}>Select a state</option><!--[-->`);
+          ssrRenderList(usStates, (state) => {
+            _push(`<option${ssrRenderAttr("value", state)}${ssrIncludeBooleanAttr(Array.isArray(unref(form).state) ? ssrLooseContain(unref(form).state, state) : ssrLooseEqual(unref(form).state, state)) ? " selected" : ""}>${ssrInterpolate(state)}</option>`);
+          });
+          _push(`<!--]--></select></div>`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`<button type="submit" class="submit-btn">SUBMIT</button></form></div></main>`);
+      } else if (_ctx.$route.path === "/contact") {
+        _push(`<main><hr class="site-hr"><div class="post-form-container"><h1 class="post-title">GET IN TOUCH<span class="green-period">.</span> WE&#39;RE LISTENING<span class="green-period">.</span></h1><form class="post-form"><div class="form-group"><label for="contact-name" class="form-label">NAME</label><input type="text" id="contact-name"${ssrRenderAttr("value", unref(contactForm).name)} class="form-input" placeholder="Your actual name this time..." required></div><div class="form-group"><label for="contact-email" class="form-label">EMAIL</label><input type="email" id="contact-email"${ssrRenderAttr("value", unref(contactForm).email)} class="form-input" placeholder="We promise not to spam you with mom jokes..." required></div><div class="form-group"><label for="contact-message" class="form-label">MESSAGE</label><textarea id="contact-message" class="form-textarea" rows="6" placeholder="Tell us what&#39;s on your mind. Complaints about your mom are welcome..." required>${ssrInterpolate(unref(contactForm).message)}</textarea></div><div class="form-group"><label for="contact-country" class="form-label">COUNTRY</label><select id="contact-country" class="form-select" required><option value="" disabled${ssrIncludeBooleanAttr(Array.isArray(unref(contactForm).country) ? ssrLooseContain(unref(contactForm).country, "") : ssrLooseEqual(unref(contactForm).country, "")) ? " selected" : ""}>Select a country</option><!--[-->`);
+        ssrRenderList(countries, (country) => {
+          _push(`<option${ssrRenderAttr("value", country)}${ssrIncludeBooleanAttr(Array.isArray(unref(contactForm).country) ? ssrLooseContain(unref(contactForm).country, country) : ssrLooseEqual(unref(contactForm).country, country)) ? " selected" : ""}>${ssrInterpolate(country)}</option>`);
+        });
+        _push(`<!--]--></select></div>`);
+        if (unref(contactForm).country === "United States") {
+          _push(`<div class="form-group"><label for="contact-state" class="form-label">STATE</label><select id="contact-state" class="form-select" required><option value="" disabled${ssrIncludeBooleanAttr(Array.isArray(unref(contactForm).state) ? ssrLooseContain(unref(contactForm).state, "") : ssrLooseEqual(unref(contactForm).state, "")) ? " selected" : ""}>Select a state</option><!--[-->`);
+          ssrRenderList(usStates, (state) => {
+            _push(`<option${ssrRenderAttr("value", state)}${ssrIncludeBooleanAttr(Array.isArray(unref(contactForm).state) ? ssrLooseContain(unref(contactForm).state, state) : ssrLooseEqual(unref(contactForm).state, state)) ? " selected" : ""}>${ssrInterpolate(state)}</option>`);
+          });
+          _push(`<!--]--></select></div>`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`<button type="submit" class="submit-btn">SEND MESSAGE</button></form></div></main>`);
+      } else if (_ctx.$route.path === "/about") {
+        _push(`<main><hr class="site-hr"><div class="about-container"><h1 class="about-title">She typed it<span class="green-period">.</span> You read it<span class="green-period">.</span> We all suffer together<span class="green-period">.</span></h1><div class="about-content"><p>She means well<span class="green-period">.</span> She really does<span class="green-period">.</span></p><p>But somewhere between the missed punctuation, the all-caps threats, the cryptic emojis, and the &quot;who is this&quot; follow-ups… something unravels<span class="green-period">.</span></p><p>Texts<span class="green-period">.</span>mom is a shrine to the glorious dysfunction of modern motherhood—one, unhinged message at a time<span class="green-period">.</span></p><p>We don&#39;t judge<span class="green-period">.</span> Okay, maybe a little<span class="green-period">.</span> We just document<span class="green-period">.</span></p><p>Whether it&#39;s passive-aggressive guilt, baffling autocorrects, or love disguised as psychological warfare, if she texted it—you can post it<span class="green-period">.</span></p><p class="about-final">You&#39;re not alone<span class="green-period">.</span> Your mom just texts like this<span class="green-period">.</span></p></div></div></main>`);
+      } else if (_ctx.$route.path.startsWith("/post/")) {
+        _push(`<main><hr class="site-hr">`);
+        if (unref(currentPost)) {
+          _push(`<div class="individual-post-container"><div class="post-navigation"><button class="back-btn"> ← Back to Feed </button><button class="next-btn"${ssrIncludeBooleanAttr(!unref(hasNextPost)) ? " disabled" : ""}${ssrRenderAttr("title", unref(hasNextPost) ? "Go to next post" : "No more posts")}> Next Mom Text → </button></div><div class="individual-post-card"><div class="post-header"><span class="post-author">${ssrInterpolate(unref(currentPost).name)}</span><span class="post-location">${ssrInterpolate(unref(currentPost).location)}</span></div><pre class="post-content whitespace-pre-wrap text-left break-words">${ssrInterpolate(unref(currentPost).message)}</pre><div class="post-footer"><div class="post-timestamp">${ssrInterpolate(formatDate(unref(currentPost).created_at))}</div><div class="post-actions"><div class="post-sharing"><button class="share-btn report-btn" title="Report this post"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"></path></svg></button><div class="share-divider"></div><button class="share-btn share-twitter" title="Share on Twitter"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg></button><button class="share-btn share-instagram" title="Share on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path></svg></button><button class="share-btn share-copy" title="Copy link"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></div><div class="post-voting"><button class="${ssrRenderClass(["vote-btn", "vote-up", { "voted": hasUserVoted(unref(currentPost).id, "up") }])}"${ssrIncludeBooleanAttr(unref(isVoting)) ? " disabled" : ""}> 👍 <span class="vote-count">${ssrInterpolate(unref(currentPost).likes || 0)}</span></button><button class="${ssrRenderClass(["vote-btn", "vote-down", { "voted": hasUserVoted(unref(currentPost).id, "down") }])}"${ssrIncludeBooleanAttr(unref(isVoting)) ? " disabled" : ""}> 👎 <span class="vote-count">${ssrInterpolate(unref(currentPost).dislikes || 0)}</span></button><button class="comment-btn"${ssrRenderAttr("title", `${getCommentCount(unref(currentPost).id)} comments`)}> 💬 <span class="comment-count">${ssrInterpolate(getCommentCount(unref(currentPost).id))}</span></button></div></div></div></div><div class="comment-section comment-section-expanded"><div class="comment-header"><h4>Comments (${ssrInterpolate(getCommentCount(unref(currentPost).id))})</h4></div><div class="comments-list">`);
+          if (unref(getCommentsForPost)(unref(currentPost).id).length === 0) {
+            _push(`<div class="no-comments"> No comments yet. Be the first to comment! </div>`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(`<!--[-->`);
+          ssrRenderList(unref(getCommentsForPost)(unref(currentPost).id), (comment) => {
+            _push(`<div class="comment-item"><div class="comment-author">${ssrInterpolate(comment.author)}</div><div class="comment-content">${ssrInterpolate(comment.content)}</div><div class="comment-timestamp">${ssrInterpolate(formatDate(comment.created_at))}</div></div>`);
+          });
+          _push(`<!--]--></div><div class="add-comment-form"><div class="comment-input-group"><input${ssrRenderAttr("value", draftFor(unref(currentPost).id).author)} type="text" placeholder="Your name..." class="comment-author-input" maxlength="50"><textarea placeholder="Write a comment..." class="comment-content-input" rows="3" maxlength="500">${ssrInterpolate(draftFor(unref(currentPost).id).content)}</textarea><button class="submit-comment-btn"${ssrIncludeBooleanAttr(isCommentDisabled(unref(currentPost).id)) ? " disabled" : ""}>`);
+          if (unref(submittingByPost)[Number(unref(currentPost).id)] || unref(commentsIsSubmitting)) {
+            _push(`<span class="spinner" aria-hidden="true"></span>`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(` ${ssrInterpolate(unref(submittingByPost)[Number(unref(currentPost).id)] || unref(commentsIsSubmitting) ? "Posting..." : "Post Comment")}</button></div></div></div></div>`);
+        } else {
+          _push(`<div class="post-not-found"><h2>Post Not Found</h2><p>The post you&#39;re looking for doesn&#39;t exist or has been removed.</p><button class="back-btn">← Back to Feed</button></div>`);
+        }
+        _push(`</main>`);
+      } else {
+        _push(`<main><hr class="site-hr"><h1 class="sr-only">TextsMom - Share Your Unhinged Mom Texts</h1><div class="main-blurb"><div class="fade-word fade-word-1">UNHINGED<span class="green-period">.</span></div><div class="fade-word fade-word-2">DERANGED<span class="green-period">.</span></div><div class="fade-word fade-word-3">CONFUSING<span class="green-period">.</span></div></div><div class="main-blurb2"><span class="typewriter">YOU KNOW A <span class="blurb2">MOM</span> TEXT WHEN YOU SEE ONE<span class="green-period">.</span></span></div><hr class="site-hr2"><div class="main-postit"><div class="postit2"><span class="green-notice">NOTICE:</span> Every 60 seconds, over 2 million texts are sent by... mothers... all over the world. If you get a mom text, stay calm and immediately share it here.</div></div>`);
+        if (unref(posts).length > 0) {
+          _push(`<div id="posts-section" class="posts-section"><hr class="site-hr"><div class="feed-title-container"><div class="feed-title-main"><span class="live-indicator">● LIVE</span><span class="feed-title-text">FRESH TEXTS</span><span class="mom-text-highlight">FROM MOMS</span></div><div class="feed-subtitle">Real texts<span class="green-period">.</span> Real chaos<span class="green-period">.</span> Real moms<span class="green-period">.</span></div></div><div class="search-filter-bar"><div class="search-container"><input type="text"${ssrRenderAttr("value", unref(searchQuery))} placeholder="Search texts..." class="search-input"><span class="search-icon">🔍</span></div><button class="random-btn" title="Show random post"> RANDOM </button><div class="filter-container"><select class="filter-select"><option value="all"${ssrIncludeBooleanAttr(Array.isArray(unref(filterOption)) ? ssrLooseContain(unref(filterOption), "all") : ssrLooseEqual(unref(filterOption), "all")) ? " selected" : ""}>All Posts</option><option value="newest"${ssrIncludeBooleanAttr(Array.isArray(unref(filterOption)) ? ssrLooseContain(unref(filterOption), "newest") : ssrLooseEqual(unref(filterOption), "newest")) ? " selected" : ""}>Newest First</option><option value="oldest"${ssrIncludeBooleanAttr(Array.isArray(unref(filterOption)) ? ssrLooseContain(unref(filterOption), "oldest") : ssrLooseEqual(unref(filterOption), "oldest")) ? " selected" : ""}>Oldest First</option><option value="most-liked"${ssrIncludeBooleanAttr(Array.isArray(unref(filterOption)) ? ssrLooseContain(unref(filterOption), "most-liked") : ssrLooseEqual(unref(filterOption), "most-liked")) ? " selected" : ""}>Most Liked</option><option value="most-disliked"${ssrIncludeBooleanAttr(Array.isArray(unref(filterOption)) ? ssrLooseContain(unref(filterOption), "most-disliked") : ssrLooseEqual(unref(filterOption), "most-disliked")) ? " selected" : ""}>Most Controversial</option></select></div></div><div class="posts-container"><!--[-->`);
+          ssrRenderList(unref(paginatedPosts), (post, index) => {
+            _push(`<div class="${ssrRenderClass(["post-card", "chat-bubble", index % 2 === 0 ? "chat-left" : "chat-right"])}"><div class="post-header"><span class="post-author">${ssrInterpolate(post.name)}</span><span class="post-location">${ssrInterpolate(post.location)}</span></div><pre class="post-content whitespace-pre-wrap text-left break-words">${ssrInterpolate(post.message)}</pre><div class="post-footer"><div class="post-timestamp">${ssrInterpolate(formatDate(post.created_at))}</div><div class="post-actions"><div class="post-sharing"><button class="share-btn report-btn" title="Report this post"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"></path></svg></button><div class="share-divider"></div><button class="share-btn share-twitter" title="Share on Twitter"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"></path></svg></button><button class="share-btn share-instagram" title="Share on Instagram"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"></path></svg></button><button class="share-btn share-copy" title="Copy link"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"></path></svg></button></div><div class="post-voting"><button class="${ssrRenderClass(["vote-btn", "vote-up", { "voted": hasUserVoted(post.id, "up") }])}"${ssrIncludeBooleanAttr(unref(isVoting)) ? " disabled" : ""}> 👍 <span class="vote-count">${ssrInterpolate(post.likes || 0)}</span></button><button class="${ssrRenderClass(["vote-btn", "vote-down", { "voted": hasUserVoted(post.id, "down") }])}"${ssrIncludeBooleanAttr(unref(isVoting)) ? " disabled" : ""}> 👎 <span class="vote-count">${ssrInterpolate(post.dislikes || 0)}</span></button><button class="comment-btn"${ssrRenderAttr("title", `${getCommentCount(post.id)} comments`)}> 💬 <span class="comment-count">${ssrInterpolate(getCommentCount(post.id))}</span></button></div></div></div>`);
+            if (isCommentsExpanded(post.id)) {
+              _push(`<div class="comment-section"><div class="comment-header"><h4>Comments (${ssrInterpolate(getCommentCount(post.id))})</h4></div><div class="comments-list">`);
+              if (unref(getCommentsForPost)(post.id).length === 0) {
+                _push(`<div class="no-comments"> No comments yet. Be the first to comment! </div>`);
+              } else {
+                _push(`<!---->`);
+              }
+              _push(`<!--[-->`);
+              ssrRenderList(unref(getCommentsForPost)(post.id), (comment) => {
+                _push(`<div class="comment-item"><div class="comment-author">${ssrInterpolate(comment.author)}</div><div class="comment-content">${ssrInterpolate(comment.content)}</div><div class="comment-timestamp">${ssrInterpolate(formatDate(comment.created_at))}</div></div>`);
+              });
+              _push(`<!--]--></div><div class="add-comment-form"><div class="comment-input-group"><input${ssrRenderAttr("value", draftFor(post.id).author)} type="text" placeholder="Your name..." class="comment-author-input" maxlength="50"><textarea placeholder="Write a comment..." class="comment-content-input" rows="3" maxlength="500">${ssrInterpolate(draftFor(post.id).content)}</textarea><button class="submit-comment-btn"${ssrIncludeBooleanAttr(isCommentDisabled(post.id)) ? " disabled" : ""}>`);
+              if (unref(submittingByPost)[Number(post.id)] || unref(commentsIsSubmitting)) {
+                _push(`<span class="spinner" aria-hidden="true"></span>`);
+              } else {
+                _push(`<!---->`);
+              }
+              _push(` ${ssrInterpolate(unref(submittingByPost)[Number(post.id)] || unref(commentsIsSubmitting) ? "Posting..." : "Post Comment")}</button></div></div></div>`);
+            } else {
+              _push(`<!---->`);
+            }
+            _push(`</div>`);
+          });
+          _push(`<!--]--></div>`);
+          if (unref(totalPages) > 1) {
+            _push(`<div class="pagination"><button${ssrIncludeBooleanAttr(unref(currentPage) === 1) ? " disabled" : ""} class="pagination-btn pagination-prev"> ← PREVIOUS </button><div class="pagination-info"><span class="page-indicator">${ssrInterpolate(unref(currentPage))} of ${ssrInterpolate(unref(totalPages))}</span></div><button${ssrIncludeBooleanAttr(unref(currentPage) === unref(totalPages)) ? " disabled" : ""} class="pagination-btn pagination-next"> NEXT → </button></div>`);
+          } else {
+            _push(`<!---->`);
+          }
+          _push(`</div>`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`</main>`);
+      }
+      _push(`<footer class="site-footer"><div class="copyright"> 2025 texts.mom - All rights reserved </div></footer>`);
+      if (unref(showSuccessModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content"><div class="modal-header"><div class="success-icon">✓</div><h2 class="modal-title">TEXT SUBMITTED<span class="green-period">!</span></h2></div><div class="modal-body"><p class="modal-message">Thank you for sharing your mom text! It has been posted and is now live on the homepage.</p><p class="modal-submessage">Your contribution helps others laugh, cry, and question reality together.</p></div><div class="modal-actions"><button class="modal-btn modal-btn-primary">VIEW ON HOMEPAGE</button><button class="modal-btn modal-btn-secondary">SUBMIT ANOTHER</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      if (unref(showProfanityModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content"><div class="modal-header"><div class="warning-icon">🚫</div><h2 class="modal-title">CONTENT FILTERED<span class="green-period">!</span></h2></div><div class="modal-body">`);
+        if (unref(profanityModalType) === "name") {
+          _push(`<p class="modal-message">Your mom says a lot of things but she didn&#39;t name you that. Keep your name clean and family-friendly.</p>`);
+        } else {
+          _push(`<p class="modal-message">Your mom text contains inappropriate language. We were shocked too.</p>`);
+        }
+        if (unref(profanityModalType) === "name") {
+          _push(`<p class="modal-submessage">We want to maintain a positive community for everyone.</p>`);
+        } else {
+          _push(`<p class="modal-submessage">We know mom texts can be wild, but let&#39;s keep the language clean!</p>`);
+        }
+        _push(`</div><div class="modal-actions"><button class="modal-btn modal-btn-primary">GOT IT</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      if (unref(showRateLimitModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content"><div class="modal-header"><div class="warning-icon">⏰</div><h2 class="modal-title">WHOA! SLOW DOWN THERE!<span class="green-period">!</span></h2></div><div class="modal-body"><p class="modal-message">You can submit another post in ${ssrInterpolate(unref(rateLimitRemainingTime))} seconds.</p><p class="modal-submessage">This helps prevent spam and keeps the quality high.</p></div><div class="modal-actions"><button class="modal-btn modal-btn-primary">UNDERSTOOD</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      if (unref(showModerationModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content"><div class="modal-header"><div class="warning-icon">🤖</div><h2 class="modal-title">CONTENT FLAGGED<span class="green-period">!</span></h2></div><div class="modal-body"><p class="modal-message">Our AI moderation system has flagged your content.</p><p class="modal-submessage">Detected: <strong>${ssrInterpolate(unref(moderationViolationType))}</strong></p><p class="modal-submessage">Please revise your message to comply with our community guidelines.</p></div><div class="modal-actions"><button class="modal-btn modal-btn-primary">REVISE CONTENT</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      if (unref(showShareModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content"><div class="modal-header"><div class="warning-icon">✨</div><h2 class="modal-title">SHARE SUCCESS<span class="green-period">!</span></h2></div><div class="modal-body"><p class="modal-message">${ssrInterpolate(unref(shareModalMessage))}</p></div><div class="modal-actions"><button class="modal-btn modal-btn-primary">AWESOME</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      if (unref(showReportModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content"><div class="modal-header"><div class="warning-icon">🛡️</div><h2 class="modal-title">REPORT POST<span class="green-period">.</span></h2></div><div class="modal-body"><p class="modal-message">Why are you reporting this post?</p><div class="report-reasons"><button class="report-reason-btn">Inappropriate Content</button><button class="report-reason-btn">Spam</button><button class="report-reason-btn">Harassment</button><button class="report-reason-btn">Fake/Misleading</button><button class="report-reason-btn">Other</button></div></div><div class="modal-actions"><button class="modal-btn modal-btn-secondary">CANCEL</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      if (unref(showReportSuccessModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content"><div class="modal-header"><div class="success-icon">✅</div><h2 class="modal-title">REPORT SUBMITTED<span class="green-period">!</span></h2></div><div class="modal-body"><p class="modal-message">Thank you for helping keep our community safe!</p><p class="modal-submessage">We&#39;ll review this post and take appropriate action if needed. Your report helps us maintain a positive environment for everyone.</p></div><div class="modal-actions"><button class="modal-btn modal-btn-primary">UNDERSTOOD</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      if (unref(showRandomPostModal)) {
+        _push(`<div class="modal-overlay"><div class="modal-content random-post-modal"><div class="modal-header"><div class="random-icon">🎲</div><h2 class="modal-title">RANDOM MOM TEXT<span class="green-period">!</span></h2></div>`);
+        if (unref(currentRandomPost)) {
+          _push(`<div class="modal-body"><div class="random-post-display"><div class="random-post-bubble chat-bubble chat-left"><div class="post-header"><span class="post-author">${ssrInterpolate(unref(currentRandomPost).name)}</span><span class="post-location">${ssrInterpolate(unref(currentRandomPost).location)}</span></div><div class="post-content">${ssrInterpolate(unref(currentRandomPost).message)}</div><div class="post-footer"><div class="post-timestamp">${ssrInterpolate(formatDate(unref(currentRandomPost).created_at))}</div></div></div></div></div>`);
+        } else {
+          _push(`<!---->`);
+        }
+        _push(`<div class="modal-actions"><button class="modal-btn modal-btn-secondary">ANOTHER RANDOM POST</button><button class="modal-btn modal-btn-primary">CLOSE</button></div></div></div>`);
+      } else {
+        _push(`<!---->`);
+      }
+      _push(`</div>`);
     };
   }
 };
-const _sfc_setup$3 = _sfc_main$3.setup;
-_sfc_main$3.setup = (props, ctx) => {
-  const ssrContext = useSSRContext();
-  (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("../node_modules/nuxt/dist/app/components/welcome.vue");
-  return _sfc_setup$3 ? _sfc_setup$3(props, ctx) : void 0;
-};
-const __nuxt_component_1 = /* @__PURE__ */ _export_sfc(_sfc_main$3, [["__scopeId", "data-v-7c414115"]]);
-const _sfc_main$2 = {};
-function _sfc_ssrRender(_ctx, _push, _parent, _attrs) {
-  const _component_NuxtRouteAnnouncer = __nuxt_component_0;
-  const _component_NuxtWelcome = __nuxt_component_1;
-  _push(`<div${ssrRenderAttrs(_attrs)}>`);
-  _push(ssrRenderComponent(_component_NuxtRouteAnnouncer, null, null, _parent));
-  _push(ssrRenderComponent(_component_NuxtWelcome, null, null, _parent));
-  _push(`</div>`);
-}
 const _sfc_setup$2 = _sfc_main$2.setup;
 _sfc_main$2.setup = (props, ctx) => {
   const ssrContext = useSSRContext();
   (ssrContext.modules || (ssrContext.modules = /* @__PURE__ */ new Set())).add("app.vue");
   return _sfc_setup$2 ? _sfc_setup$2(props, ctx) : void 0;
 };
-const AppComponent = /* @__PURE__ */ _export_sfc(_sfc_main$2, [["ssrRender", _sfc_ssrRender]]);
 const _sfc_main$1 = {
   __name: "nuxt-error-page",
   __ssrInlineRender: true,
@@ -711,8 +2105,8 @@ const _sfc_main$1 = {
     const statusMessage = _error.statusMessage ?? (is404 ? "Page Not Found" : "Internal Server Error");
     const description = _error.message || _error.toString();
     const stack = void 0;
-    const _Error404 = defineAsyncComponent(() => import('./error-404-C-pR1CQi.mjs'));
-    const _Error = defineAsyncComponent(() => import('./error-500-Dk51HdfW.mjs'));
+    const _Error404 = defineAsyncComponent(() => import('./error-404-CmmQ_OeB.mjs'));
+    const _Error = defineAsyncComponent(() => import('./error-500-BeYnhgjA.mjs'));
     const ErrorTemplate = is404 ? _Error404 : _Error;
     return (_ctx, _push, _parent, _attrs) => {
       _push(ssrRenderComponent(unref(ErrorTemplate), mergeProps({ statusCode: unref(statusCode), statusMessage: unref(statusMessage), description: unref(description), stack: unref(stack) }, _attrs), null, _parent));
@@ -759,7 +2153,7 @@ const _sfc_main = {
           } else if (unref(SingleRenderer)) {
             ssrRenderVNode(_push, createVNode(resolveDynamicComponent(unref(SingleRenderer)), null, null), _parent);
           } else {
-            _push(ssrRenderComponent(unref(AppComponent), null, null, _parent));
+            _push(ssrRenderComponent(unref(_sfc_main$2), null, null, _parent));
           }
         },
         _: 1
@@ -793,5 +2187,5 @@ let entry;
 }
 const entry$1 = (ssrContext) => entry(ssrContext);
 
-export { _export_sfc as _, useNuxtApp as a, useRuntimeConfig as b, nuxtLinkDefaults as c, useHead as d, entry$1 as default, navigateTo as n, resolveRouteObject as r, useRouter as u };
+export { __nuxt_component_0 as _, entry$1 as default, useHead as u };
 //# sourceMappingURL=server.mjs.map
