@@ -730,13 +730,8 @@
 </template>
 
 <script setup>
-import { useSupabase } from '../composables/useSupabase.js'
-import { useToast } from 'vue-toastification'
-import { useComments } from '../composables/useComments'
 
-// Shared Supabase client (uses runtimeConfig/public or .env)
-const { supabase } = useSupabase()
-const toast = useToast()
+// Supabase is now accessed only inside composables (usePosts/useComments)
 
 // -----------------------
 // Comment System (Composable)

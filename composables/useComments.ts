@@ -1,7 +1,7 @@
 // ~/composables/useComments.ts
 import { ref } from 'vue'
 import { useToast } from 'vue-toastification'
-import { useSupabase } from './useSupabase'
+import { useSupabase } from './useSupabase.js'
 
 export type CommentRecord = {
   id?: number
@@ -12,8 +12,13 @@ export type CommentRecord = {
 }
 
 export function useComments() {
-  const { supabase } = useSupabase()
-  const toast = useToast()
+  // Create a safe toast accessor that won't crash during SSR
+  const getToast = () => {
+    if (typeof window === 'undefined') {
+      return { success: (_msg?: string) => {}, error: (_msg?: string) => {} } as any
+    }
+    return useToast()
+  }
 
   // Map of post_id -> array of comments
   const comments = ref<Record<number, CommentRecord[]>>({})
@@ -22,6 +27,9 @@ export function useComments() {
 
   // Load all comments, grouped by post_id
   const loadAllComments = async () => {
+    // Avoid SSR crashes; this is intended for client-side hydration
+    if (typeof window === 'undefined') return
+    const { supabase } = useSupabase()
     try {
       const { data, error } = await supabase
         .from('comments')
@@ -78,6 +86,8 @@ export function useComments() {
     comments.value[pid] = [...(comments.value[pid] || []), optimistic]
 
     try {
+      if (typeof window === 'undefined') throw new Error('Cannot submit on server')
+      const { supabase } = useSupabase()
       // Prefer not to select-after-insert to avoid RLS issues; rely on optimistic update
       const { error } = await supabase
         .from('comments')
@@ -95,14 +105,14 @@ export function useComments() {
 
       // Optionally, you could refresh just this post's comments here if desired
       // but to reduce load, we keep the optimistic item.
-      toast.success('Comment posted!')
+      getToast().success('Comment posted!')
     } catch (err: any) {
       console.error('Failed to post comment', err)
       errorMessage.value = err?.message || 'Failed to post comment.'
 
       // Roll back optimistic update on failure
       comments.value[pid] = (comments.value[pid] || []).filter((c) => c !== optimistic)
-      toast.error(errorMessage.value)
+      getToast().error(errorMessage.value)
     } finally {
       isSubmitting.value = false
     }
