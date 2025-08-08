@@ -732,7 +732,6 @@
 <script setup>
 import { useSupabase } from '../composables/useSupabase.js'
 import { useToast } from 'vue-toastification'
-import { usePosts } from '../composables/usePosts'
 import { useComments } from '../composables/useComments'
 
 // Shared Supabase client (uses runtimeConfig/public or .env)
