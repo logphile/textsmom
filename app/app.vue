@@ -302,10 +302,10 @@
           
           <!-- Existing Comments -->
           <div class="comments-list">
-            <div v-if="getPostComments(currentPost.id).length === 0" class="no-comments">
+            <div v-if="getCommentsForPost(currentPost.id).length === 0" class="no-comments">
               No comments yet. Be the first to comment!
             </div>
-            <div v-for="comment in getPostComments(currentPost.id)" :key="comment.id" class="comment-item">
+            <div v-for="comment in getCommentsForPost(currentPost.id)" :key="comment.id" class="comment-item">
               <div class="comment-author">{{ comment.author }}</div>
               <div class="comment-content">{{ comment.content }}</div>
               <div class="comment-timestamp">{{ formatDate(comment.created_at) }}</div>
@@ -316,25 +316,26 @@
           <div class="add-comment-form">
             <div class="comment-input-group">
               <input 
-                v-model="newComment.author" 
+                v-model="draftFor(currentPost.id).author" 
                 type="text" 
                 placeholder="Your name..."
                 class="comment-author-input"
                 maxlength="50"
               >
               <textarea 
-                v-model="newComment.content" 
+                v-model="draftFor(currentPost.id).content" 
                 placeholder="Write a comment..."
                 class="comment-content-input"
                 rows="3"
                 maxlength="500"
               ></textarea>
               <button 
-                @click="submitComment(currentPost.id)"
+                @click="submitCommentFor(currentPost.id)"
                 class="submit-comment-btn"
-                :disabled="!newComment.author.trim() || !newComment.content.trim() || isSubmittingComment"
+                :disabled="isCommentDisabled(currentPost.id)"
               >
-                {{ isSubmittingComment ? 'Posting...' : 'Post Comment' }}
+                <span v-if="submittingByPost[Number(currentPost.id)] || commentsIsSubmitting" class="spinner" aria-hidden="true"></span>
+                {{ (submittingByPost[Number(currentPost.id)] || commentsIsSubmitting) ? 'Posting...' : 'Post Comment' }}
               </button>
             </div>
           </div>
@@ -498,10 +499,10 @@
               
               <!-- Existing Comments -->
               <div class="comments-list">
-                <div v-if="getPostComments(post.id).length === 0" class="no-comments">
+                <div v-if="getCommentsForPost(post.id).length === 0" class="no-comments">
                   No comments yet. Be the first to comment!
                 </div>
-                <div v-for="comment in getPostComments(post.id)" :key="comment.id" class="comment-item">
+                <div v-for="comment in getCommentsForPost(post.id)" :key="comment.id" class="comment-item">
                   <div class="comment-author">{{ comment.author }}</div>
                   <div class="comment-content">{{ comment.content }}</div>
                   <div class="comment-timestamp">{{ formatDate(comment.created_at) }}</div>
@@ -512,25 +513,26 @@
               <div class="add-comment-form">
                 <div class="comment-input-group">
                   <input 
-                    v-model="newComment.author" 
+                    v-model="draftFor(post.id).author" 
                     type="text" 
                     placeholder="Your name..."
                     class="comment-author-input"
                     maxlength="50"
                   >
                   <textarea 
-                    v-model="newComment.content" 
+                    v-model="draftFor(post.id).content" 
                     placeholder="Write a comment..."
                     class="comment-content-input"
                     rows="3"
                     maxlength="500"
                   ></textarea>
                   <button 
-                    @click="submitComment(post.id)"
+                    @click="submitCommentFor(post.id)"
                     class="submit-comment-btn"
-                    :disabled="!newComment.author.trim() || !newComment.content.trim() || isSubmittingComment"
+                    :disabled="isCommentDisabled(post.id)"
                   >
-                    {{ isSubmittingComment ? 'Posting...' : 'Post Comment' }}
+                    <span v-if="submittingByPost[Number(post.id)] || commentsIsSubmitting" class="spinner" aria-hidden="true"></span>
+                    {{ (submittingByPost[Number(post.id)] || commentsIsSubmitting) ? 'Posting...' : 'Post Comment' }}
                   </button>
                 </div>
               </div>
@@ -728,113 +730,84 @@
 </template>
 
 <script setup>
-import { getSupabase } from '../composables/useSupabase.js'
+import { useSupabase } from '../composables/useSupabase.js'
+import { useToast } from 'vue-toastification'
+import { usePosts } from '../composables/usePosts'
+import { useComments } from '../composables/useComments'
 
 // Shared Supabase client (uses runtimeConfig/public or .env)
-const supabase = getSupabase()
+const { supabase } = useSupabase()
+const toast = useToast()
 
 // -----------------------
-// Comment System (Supabase)
+// Comment System (Composable)
 // -----------------------
-// State
-const comments = ref({}) // { [post_id]: Array<Comment> }
-const newComment = ref({ author: '', content: '' })
-const isSubmittingComment = ref(false)
-// Track which posts have their comments expanded
-const expandedComments = ref({}) // { [post_id]: boolean }
+const {
+  comments,
+  loadAllComments,
+  getCommentsForPost,
+  submitComment,
+  isSubmitting: commentsIsSubmitting,
+  isPostDisabled: commentsIsPostDisabled,
+  errorMessage,
+} = useComments()
 
-// Load all comments, grouped by post_id
-const loadAllComments = async () => {
+// Local v-models for the new comment form per-post
+const newCommentForms = ref({})
+
+// Helper to get/create a draft object per post, preserving existing template usage
+const draftFor = (postId) => {
+  const pid = Number(postId)
+  if (!newCommentForms.value[pid]) {
+    newCommentForms.value[pid] = { author: '', content: '' }
+  }
+  return newCommentForms.value[pid]
+}
+
+// Per-post submitting flag to drive spinner/label visibility
+const submittingByPost = ref({}) // { [post_id]: boolean }
+
+// Local wrapper to reflect composable's disabled guard signature
+const isCommentDisabled = (postId) => {
+  const d = draftFor(postId)
+  const pid = Number(postId)
+  return commentsIsPostDisabled(d.author, d.content) || !!submittingByPost.value[pid]
+}
+
+// Local wrapper to call composable submit and clear inputs
+const submitCommentFor = async (postId) => {
+  const d = draftFor(postId)
+  const pid = Number(postId)
+  console.log('[comments] submit start for post', pid)
+  submittingByPost.value[pid] = true
+  await nextTick() // ensure DOM updates so spinner/label render
   try {
-    const { data, error } = await supabase
-      .from('comments')
-      .select('*')
-      .order('created_at', { ascending: true })
-
-    if (error) {
-      console.error('Error loading comments:', error)
-      return
-    }
-
-    comments.value = (data || []).reduce((acc, c) => {
-      (acc[c.post_id] ||= []).push(c)
-      return acc
-    }, {})
-  } catch (err) {
-    console.error('Unexpected error loading comments:', err)
+    await submitComment(pid, d.author, d.content)
+  } finally {
+    // Clear on completion regardless of outcome; optimistic rollback handled in composable
+    d.author = ''
+    d.content = ''
+    submittingByPost.value[pid] = false
+    console.log('[comments] submit end for post', pid)
   }
 }
 
-onMounted(loadAllComments)
-
-// Accessors used by template
-const getPostComments = (postId) => comments.value[postId] || []
-const getCommentCount = (postId) => getPostComments(postId).length
+// UI-only: expanded state per post (kept local, not in composable)
+const expandedComments = ref({}) // { [post_id]: boolean }
 const isCommentsExpanded = (postId) => !!expandedComments.value[postId]
-
-// Toggle expanded state and scroll into view when expanding
 const toggleComments = async (postId) => {
   expandedComments.value[postId] = !expandedComments.value[postId]
-  // If we just expanded, scroll to the comment section for this post
   if (expandedComments.value[postId]) {
     await nextTick()
     const sections = document.querySelectorAll('.comment-section')
-    if (sections && sections.length) {
-      // Scroll the first visible comment section into view (closest to the click)
-      sections[0].scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
+    if (sections && sections.length) sections[0].scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
-// Submit a new comment for a post
-const submitComment = async (postId) => {
-  const author = (newComment.value.author || '').trim()
-  const content = (newComment.value.content || '').trim()
-  if (!author || !content) return
+// Helper for comment counts using composable data
+const getCommentCount = (postId) => (getCommentsForPost(postId) || []).length
 
-  isSubmittingComment.value = true
-  try {
-    console.log('[submitComment] payload:', { postId, author, content })
-    const { data: inserted, error } = await supabase
-      .from('comments')
-      .insert([{ 
-        post_id: Number(postId), 
-        author, 
-        // Write to both to handle schemas that still use comment_text with NOT NULL
-        content, 
-        comment_text: content,
-        created_at: new Date().toISOString()
-      }])
-
-    if (error) {
-      console.error('[submitComment] supabase error:', {
-        code: error.code, message: error.message, details: error.details, hint: error.hint
-      })
-      throw error
-    }
-
-    // Build normalized comment locally (no select-after-insert required)
-    const normalized = {
-      id: inserted?.[0]?.id ?? Math.random().toString(36).slice(2),
-      post_id: Number(postId),
-      author,
-      content,
-      created_at: new Date().toISOString()
-    }
-
-    // Update local cache so it appears immediately
-    comments.value[postId] = [ ...(comments.value[postId] || []), normalized ]
-
-    // Clear inputs
-    newComment.value.author = ''
-    newComment.value.content = ''
-  } catch (err) {
-    console.error('Comment submit error:', err)
-    alert('Failed to post comment.')
-  } finally {
-    isSubmittingComment.value = false
-  }
-}
+onMounted(loadAllComments)
 
 // SEO field generation functions (integrated directly)
 const generateSlug = (text, maxLength = 60) => {
@@ -1042,16 +1015,26 @@ const addPost = async (postData) => {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error adding post:', errorText);
-      return { post: null, error: new Error(errorText) };
+      // Try to parse JSON error to extract a friendly message
+      let message = 'Failed to submit post.'
+      try {
+        const errJson = await response.json()
+        console.error('Error adding post (JSON):', errJson)
+        message = errJson.message || errJson.statusMessage || message
+      } catch (_) {
+        const errorText = await response.text()
+        console.error('Error adding post (text):', errorText)
+      }
+      return { post: null, error: new Error(message) };
     }
 
     const { post } = await response.json();
     return { post, error: null };
   } catch (error) {
-    console.error('Network or unexpected error in addPost:', error);
-    return { post: null, error };
+    console.error('Network or unexpected error in addPost:', error)
+    // Normalize to a friendly message while logging details
+    const message = error?.message || 'Failed to submit post.'
+    return { post: null, error: new Error(message) }
   }
 }
 
@@ -1092,10 +1075,8 @@ const contactForm = ref({
   state: ''
 })
 
-// Posts data from Supabase
-const posts = ref([])
-const isLoading = ref(false)
-const totalPostsCount = ref(0)
+// Posts data via composable
+const { posts, isLoading, totalPostsCount, loadPosts } = usePosts()
 const showSuccessModal = ref(false)
 const showProfanityModal = ref(false)
 const showRateLimitModal = ref(false)
@@ -1750,7 +1731,7 @@ const submitPost = async () => {
           errorString.includes('table') && errorString.includes('not found') ||
           errorString.includes('posts') && errorString.includes('does not exist')) {
         
-        alert('❌ Database table not found!\n\nThe posts table doesn\'t exist in your Supabase database yet.\n\nPlease create it by running the SQL commands shown in the browser console.')
+        toast.error('Database table not found. See console for setup SQL.')
         
         console.log(`
 🗄️ CREATE THE POSTS TABLE IN SUPABASE:
@@ -1793,12 +1774,13 @@ INSERT INTO posts (name, message, location) VALUES
 6. Try submitting a post again!
 `)
       } else {
-        alert(`❌ Database error occurred!\n\nError: ${errorMessage}\n\nCheck the browser console for full details.`)
+        toast.error('Failed to submit post. Please try again.')
       }
       return
     }
     
     console.log('Post submitted successfully with SEO fields:', post)
+    toast.success('Post submitted!')
     
     // Update rate limiting timestamp
     lastSubmissionTime.value = Date.now()
@@ -1826,7 +1808,7 @@ INSERT INTO posts (name, message, location) VALUES
     
   } catch (error) {
     console.error('Unexpected error submitting post:', error)
-    alert(`Unexpected error: ${error.message}. Check the console for details.`)
+    toast.error('Failed to submit post. Please try again.')
   } finally {
     isLoading.value = false
     isSubmitting.value = false
@@ -1848,77 +1830,7 @@ const viewHomepage = async () => {
   await navigateTo('/')
 }
 
-// Load posts from Supabase
-const loadPosts = async () => {
-  isLoading.value = true
-  try {
-    console.log('Loading all posts...')
-    // Define pagination bounds (local, avoids ReferenceError if not set elsewhere)
-    const pageSize = 50
-    const from = 0
-    const to = from + pageSize - 1
-    console.log('[loadPosts] querying posts (paginated)')
-    const { data, error, count } = await supabase
-      .from('posts')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, to)
-    console.log('[loadPosts] result (paginated):', { length: data?.length || 0, count, error })
-
-    if (error || !data || data.length === 0) {
-      console.warn('[loadPosts] paginated query empty or errored; retrying simple select without range')
-      const { data: dataAll, error: errAll } = await supabase
-        .from('posts')
-        .select('*')
-        .order('created_at', { ascending: false })
-      console.log('[loadPosts] result (simple):', { length: dataAll?.length || 0, error: errAll })
-      if (errAll) {
-        console.error('Error loading posts (simple):', errAll)
-        posts.value = []
-        totalPostsCount.value = 0
-        return
-      }
-      // Use simple results
-      posts.value = dataAll || []
-      totalPostsCount.value = dataAll?.length || 0
-      return
-    }
-
-    if (data && data.length > 0) {
-      // Specific post lookup for debugging purposes
-      if (data.some(p => p.id === 68)) {
-        console.log('Post 68 found in loaded data')
-      } else {
-        console.log('Post 68 not found in loaded data')
-        console.log('Available post IDs:', data.map(p => p.id))
-      }
-    }
-    
-    console.log('Posts loaded from Supabase:', data?.length || 0, 'posts')
-    if (data && data.length > 0) {
-      console.log('Sample post data:', data[0])
-      const post68 = data.find(p => p.id === 68)
-      console.log('Post 68 data:', post68)
-      if (post68) {
-        console.log('Post 68 likes:', post68.likes, 'dislikes:', post68.dislikes)
-      } else {
-        console.log('Post 68 not found in loaded data')
-        console.log('Available post IDs:', data.map(p => p.id))
-      }
-    }
-    
-    posts.value = data || []
-    totalPostsCount.value = count || 0
-    
-  } catch (error) {
-    console.error('Error loading posts (exception):', error)
-    // Fallback to empty array
-    posts.value = []
-    totalPostsCount.value = 0
-  } finally {
-    isLoading.value = false
-  }
-}
+// loadPosts now provided by usePosts()
 
 // Pagination functions for client-side pagination
 const nextPage = () => {
@@ -2271,6 +2183,9 @@ watch(currentPost, (newPost) => {
 </script>
 
 <style>
+/* Restore Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
+
 /* Pulse animations for chat bubbles */
 @keyframes pulseGreen {
   0%, 100% {
@@ -2293,9 +2208,6 @@ watch(currentPost, (newPost) => {
     transform: scale(1.02);
   }
 }
-
-/* Restore Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
 
 /* Base typography setup */
 body {
@@ -4394,6 +4306,8 @@ img {
   cursor: pointer;
   transition: all 0.2s ease;
   align-self: flex-start;
+  position: relative; /* for spinner anchoring */
+  padding-left: 2.5rem; /* space for spinner */
 }
 
 .submit-comment-btn:hover:not(:disabled) {
@@ -4406,6 +4320,32 @@ img {
   color: #888;
   cursor: not-allowed;
   transform: none;
+}
+
+/* Inline error message shown under the comment inputs */
+.error-message {
+  margin: 0.5rem 0;
+  color: #b00020;
+  font-size: 0.9rem;
+}
+
+/* Inline spinner used inside submit button */
+.spinner {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  border-left-color: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 /* Mobile responsive for comments */
@@ -4428,6 +4368,7 @@ img {
   .submit-comment-btn {
     padding: 0.6rem 1.2rem;
     font-size: 0.9rem;
+    padding-left: 2.2rem; /* keep spinner space on mobile */
   }
 }
 

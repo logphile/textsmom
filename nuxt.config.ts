@@ -2,6 +2,7 @@
 export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   devtools: { enabled: true },
+  plugins: ['~/plugins/toast.client.ts'],
   runtimeConfig: {
     public: {
       supabaseUrl: process.env.SUPABASE_URL || '',

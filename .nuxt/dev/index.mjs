@@ -1119,22 +1119,7 @@ const plugins = [
 _WX8osOuIYMOpY7DsHJLnxRsQzW4to65CVLd4Gv8uU
 ];
 
-const assets = {
-  "/index.mjs": {
-    "type": "text/javascript; charset=utf-8",
-    "etag": "\"157fb-Bcz5NsmjDjGqRNzoUVwcmx4T9MA\"",
-    "mtime": "2025-08-07T20:30:40.502Z",
-    "size": 88059,
-    "path": "index.mjs"
-  },
-  "/index.mjs.map": {
-    "type": "application/json",
-    "etag": "\"5133a-q3VF/5e+R9oOaH1OHwLl9aZ1Az8\"",
-    "mtime": "2025-08-07T20:30:40.502Z",
-    "size": 332602,
-    "path": "index.mjs.map"
-  }
-};
+const assets = {};
 
 function readAsset (id) {
   const serverDir = dirname$1(fileURLToPath(globalThis._importMeta_.url));
@@ -2001,25 +1986,47 @@ const moderate_post$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.definePro
 }, Symbol.toStringTag, { value: 'Module' }));
 
 const posts_post = defineEventHandler(async (event) => {
+  var _a;
   const body = await readBody(event);
-  const supabase = createClient(
-    process.env.SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-  const { data: post, error: insertError } = await supabase.from("posts").insert({
-    ...body,
-    status: "approved",
-    // Set status directly to approved
-    created_at: (/* @__PURE__ */ new Date()).toISOString()
-  }).select().single();
-  if (insertError) {
-    console.error("Error inserting post:", insertError);
+  let runtimeConfig;
+  try {
+    runtimeConfig = useRuntimeConfig(event);
+  } catch {
+  }
+  const SUPABASE_URL = ((runtimeConfig == null ? void 0 : runtimeConfig.supabaseUrl) || ((_a = runtimeConfig == null ? void 0 : runtimeConfig.public) == null ? void 0 : _a.supabaseUrl) || process.env.SUPABASE_URL || "").trim();
+  const SUPABASE_SERVICE_ROLE_KEY = ((runtimeConfig == null ? void 0 : runtimeConfig.supabaseServiceRoleKey) || process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[api/posts] Missing Supabase env:", {
+      hasUrl: !!SUPABASE_URL,
+      hasServiceKey: !!SUPABASE_SERVICE_ROLE_KEY
+    });
     throw createError({
       statusCode: 500,
-      statusMessage: "Failed to submit post."
+      statusMessage: "Failed to submit post.",
+      message: "Supabase configuration missing. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
     });
   }
-  return { success: true, post };
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  try {
+    const { data, error } = await supabase.from("posts").insert([{
+      ...body,
+      // status: 'pending', // enable if using background moderation
+      status: "approved",
+      created_at: (/* @__PURE__ */ new Date()).toISOString()
+    }]).select("*").single();
+    if (error) {
+      console.error("[api/posts] Insert error:", error);
+      throw createError({ statusCode: 500, statusMessage: "Failed to submit post." });
+    }
+    return { success: true, post: data };
+  } catch (err) {
+    console.error("[api/posts] Unexpected error:", err);
+    throw createError({
+      statusCode: 500,
+      statusMessage: "Failed to submit post.",
+      message: (err == null ? void 0 : err.message) || "Unexpected error while contacting Supabase."
+    });
+  }
 });
 
 const posts_post$1 = /*#__PURE__*/Object.freeze(/*#__PURE__*/Object.defineProperty({
